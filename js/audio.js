@@ -20,7 +20,7 @@
  *   各バス(bgm / se / ambient)の dry → 音量 → コンプレッサー → マスター → スピーカー
  *   各バスの wet(残響センド)→ 音量 → ConvolverNode(ノイズから作った約2.6秒の残響)→ コンプレッサー
  *
- * BGM は先読みスケジューラー(25ms ごとに setInterval、0.12 秒先までを audioCtx.currentTime で予約)。
+ * BGM は先読みスケジューラー(50ms ごとに setInterval、0.4 秒先までを audioCtx.currentTime で予約)。
  * 曲は小節単位で組み立てるので、ループは継ぎ目なしで続く。
  */
 (function (global) {
@@ -41,7 +41,7 @@
   var curT = null, curA = null;
   var tracksLive = [], ambLive = [];
   var timer = null;
-  var LOOKAHEAD = 0.12;        // 何秒先まで予約するか
+  var LOOKAHEAD = 0.4;         // 何秒先まで予約するか(短いと、画面の処理が重い瞬間に音が抜ける)
   var XFADE = 1.2;             // クロスフェード時間
   var lastSe = {};
 
@@ -1454,7 +1454,7 @@
   }
   function buildBar(tr, now) {
     var def = tr.def, spb = 60 / def.bpm;
-    if (tr.next < now - 0.2) tr.next = now + 0.05; // タブが裏にあった等で遅れたら、今から再開
+    if (tr.next < now - 0.5) tr.next = now + 0.05; // タブが裏にあった等で遅れたら、今から再開
     var B = new Bar();
     try { def.bar(tr.bar, tr.loop, B, tr.st); } catch (e) { warn(e); }
     var t0 = tr.next, q = [];
@@ -1476,8 +1476,8 @@
         var e = tr.q[tr.qi];
         if (e.t >= ahead) break;
         tr.qi++;
-        if (e.t < now - 0.05) continue;
-        try { e.fn(Math.max(e.t, now), spb, tr.d); } catch (err) { warn(err); }
+        if (e.t < now - 0.3) continue; // 大きく遅れた音だけ捨てる(少しの遅れなら鳴らす)
+        try { e.fn(Math.max(e.t, now + 0.005), spb, tr.d); } catch (err) { warn(err); }
       } else {
         if (tr.next >= ahead) break;
         buildBar(tr, now);
@@ -1514,9 +1514,10 @@
     if (!AC) return;
     try {
       if (!ctx) {
-        ctx = new AC();
+        // 'playback' = 遅れより途切れないことを優先する(スマホで数秒おきにプツッと切れるのを防ぐ)
+        try { ctx = new AC({ latencyHint: 'playback' }); } catch (e) { ctx = new AC(); }
         build();
-        timer = setInterval(tick, 25);
+        timer = setInterval(tick, 50);
         if (curName && TRACKS[curName]) curT = startTrack(curName);
         if (curAmbName && AMB[curAmbName]) curA = startAmb(curAmbName);
       }

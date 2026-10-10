@@ -430,6 +430,7 @@ button { font-family: inherit; color: inherit; cursor: pointer; }
 }
 .su-in { width: 5.6em; }
 .su-in.seed { width: 7em; letter-spacing: .1em; }
+.su-in.age { width: 3.2em; text-align: center; }
 .su-in:disabled { color: var(--l); border-style: dashed; }
 .su-in:focus, .su-sel:focus { outline: none; border-color: var(--w); }
 .su-dice { background: var(--d); border: 2px solid var(--p); font-size: clamp(13px, 1.8cqw, 21px); padding: .15em .4em; }

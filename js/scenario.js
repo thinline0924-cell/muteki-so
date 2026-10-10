@@ -61,11 +61,12 @@
 
   // ===== 見た目(5人の枠)=====
   var LOOKS = {
-    fuyuko:    { gender: 'F', age: 34, role: 'family',  pers: 'calm',   label: '宿の女主人' },
-    shibasaki: { gender: 'M', age: 50, role: 'guest',   pers: 'calm',   occ: 'doctor',    label: '眼鏡の紳士' },
-    chikage:   { gender: 'F', age: 27, role: 'guest',   pers: 'gruff',  occ: 'painter',   label: 'ベレー帽の女性' },
-    naruse:    { gender: 'M', age: 41, role: 'guest',   pers: 'frank',  occ: 'developer', label: '口ひげの男' },
-    kuga:      { gender: 'M', age: 72, role: 'servant', pers: 'gruff',  label: '老いた下働き' }
+    // gender / age は初期値。事件の準備画面で自由に変えられる(minAge〜maxAge の範囲)
+    fuyuko:    { gender: 'F', age: 34, role: 'family',  pers: 'calm',   label: '宿の主人(依頼人の家族)', look: 'カーディガンとエプロン', minAge: 16, maxAge: 80 },
+    shibasaki: { gender: 'M', age: 50, role: 'guest',   pers: 'calm',   occ: 'doctor',    label: '泊まり客', look: '丸眼鏡とネクタイ', minAge: 18, maxAge: 85 },
+    chikage:   { gender: 'F', age: 27, role: 'guest',   pers: 'gruff',  occ: 'painter',   label: '泊まり客', look: 'ベレー帽とマフラー', minAge: 18, maxAge: 85 },
+    naruse:    { gender: 'M', age: 41, role: 'guest',   pers: 'frank',  occ: 'developer', label: '泊まり客', look: '派手なダブルの背広', minAge: 18, maxAge: 85 },
+    kuga:      { gender: 'M', age: 72, role: 'servant', pers: 'gruff',  label: '下働き(元灯台守)', look: '厚手のセーターと作業ベスト', minAge: 40, maxAge: 90 }
   };
   var IDS = ['fuyuko', 'shibasaki', 'chikage', 'naruse', 'kuga'];
   var GUESTS = ['shibasaki', 'chikage', 'naruse'];
@@ -83,18 +84,32 @@
     frank:   { name: '気さく',   reg: 'c' },
     gruff:   { name: '気難しい', reg: 'r' }
   };
+  // 依頼人(68歳の男性)との関係。g = その関係になれる性別、age = 年齢のめやす
   var RELS = {
-    daughter: { name: '娘', call: '父' },
-    wife:     { name: '妻', call: '夫' },
-    niece:    { name: '姪', call: '叔父' }
+    daughter: { name: '娘', call: '父', g: 'F', min: 16, max: 50 },
+    son:      { name: '息子', call: '親父', g: 'M', min: 16, max: 50 },
+    wife:     { name: '妻', call: '夫', g: 'F', min: 25, max: 80 },
+    niece:    { name: '姪', call: '叔父', g: 'F', min: 16, max: 60 },
+    nephew:   { name: '甥', call: '叔父', g: 'M', min: 16, max: 60 },
+    sister:   { name: '妹', call: '兄', g: 'F', min: 50, max: 80 },
+    brother:  { name: '弟', call: '兄', g: 'M', min: 50, max: 80 }
   };
+  function relsFor(gender) { return Object.keys(RELS).filter(function (k) { return RELS[k].g === gender; }); }
+  function clampAge(id, age, rel) {
+    var L = LOOKS[id], a = Math.round(Number(age) || L.age);
+    var lo = L.minAge, hi = L.maxAge;
+    if (rel && RELS[rel]) { lo = Math.max(lo, RELS[rel].min); hi = Math.min(hi, RELS[rel].max); }
+    return Math.max(lo, Math.min(hi, a));
+  }
   var DIFF = {
     easy:   { name: 'やさしい', cost: { look: 3, move: 3, talk: 6 }, hearts: 7 },
     normal: { name: 'ふつう',   cost: { look: 5, move: 5, talk: 10 }, hearts: 5 },
     hard:   { name: 'むずかしい', cost: { look: 5, move: 5, talk: 15 }, hearts: 3 }
   };
 
-  function randomName(gender, kind) {
+  function randomName(gender, kind, age) {
+    if (!kind && gender === 'M' && age >= 60) kind = 'old';
+    if (kind === 'old' && gender === 'F') kind = null;
     var mei = kind === 'old' ? MEI.OLD : kind === 'vic' ? MEI.VIC : kind === 'det' ? MEI.DET : MEI[gender];
     return { sei: pick(kind === 'vic' ? VSEI : SEI), mei: pick(mei) };
   }
@@ -110,7 +125,7 @@
     var vic = uniq('M', 'vic');
     var cfg = {
       seed: Math.floor(Math.random() * 900000) + 100000,
-      det: { sei: '烏丸', mei: '透' },
+      det: { sei: '烏丸', mei: '透', gender: 'M', age: 38 },
       victim: vic,
       cast: {},
       diff: 'normal',
@@ -119,7 +134,7 @@
     IDS.forEach(function (id) {
       var L = LOOKS[id];
       var n = id === 'fuyuko' ? { sei: vic.sei, mei: pick(MEI.F) } : uniq(L.gender, id === 'kuga' ? 'old' : null);
-      cfg.cast[id] = { sei: n.sei, mei: n.mei, pers: L.pers, occ: L.occ || null, rel: id === 'fuyuko' ? 'daughter' : null };
+      cfg.cast[id] = { sei: n.sei, mei: n.mei, pers: L.pers, occ: L.occ || null, rel: id === 'fuyuko' ? 'daughter' : null, gender: L.gender, age: L.age };
     });
     rnd = Math.random;
     return cfg;
@@ -136,12 +151,15 @@
     var P = {};
     IDS.forEach(function (id) {
       var c = cfg.cast[id], L = LOOKS[id];
+      var gender = c.gender === 'F' || c.gender === 'M' ? c.gender : L.gender;
+      var rel = null;
+      if (L.role === 'family') { rel = c.rel && RELS[c.rel] && RELS[c.rel].g === gender ? c.rel : relsFor(gender)[0]; }
       P[id] = {
         id: id, sei: c.sei, mei: c.mei, full: c.sei + c.mei,
-        gender: L.gender, age: L.age, role: L.role,
+        gender: gender, age: clampAge(id, c.age, rel), role: L.role,
         occ: L.role === 'guest' ? (c.occ || L.occ) : null,
         pers: c.pers || L.pers,
-        rel: L.role === 'family' ? (c.rel || 'daughter') : null
+        rel: rel
       };
       P[id].reg = PERS[P[id].pers].reg;
       P[id].short = id === 'fuyuko' ? c.mei : c.sei;
@@ -150,6 +168,10 @@
     var DET = { sei: cfg.det.sei, mei: cfg.det.mei, full: cfg.det.sei + cfg.det.mei };
     var fam = P.fuyuko, srv = P.kuga;
     var famRel = RELS[fam.rel];
+    var srvYears = Math.max(15, Math.min(48, srv.age - 22));
+    function numK(n) { var K = ['', '一', '二', '三', '四', '五', '六', '七', '八', '九']; var t = Math.floor(n / 10), o = n % 10; return (t ? (t > 1 ? K[t] : '') + '十' : '') + K[o]; }
+    var srvYearsK = numK(Math.round(srvYears / 5) * 5) + '年';
+    function whoWord(id) { var p = P[id]; return p.age >= 65 ? (p.gender === 'F' ? '老女' : '老人') : (p.gender === 'F' ? '彼女' : '彼'); }
     var doctorId = GUESTS.filter(function (g) { return P[g].occ === 'doctor'; })[0] || null;
 
     // ---------- 犯人・動機・トリック ----------
@@ -470,7 +492,7 @@
       kw('k_motive', '弁護士への手紙');
     } else { // wreck_silence
       MOT = { kwName: V.sei + 'の告白書', clues: ['draft'], q: V.sei + 'は今夜、二十年前の真実を明かすつもりだった。【＿】に、その名が書かれていた。',
-        claim: [S(culprit, 'angry', '{I}が旦那を殺す? 四十年も一緒にやってきた{I}が、なんで〔です|だ〕。')],
+        claim: [S(culprit, 'angry', '{I}が旦那を殺す? ' + srvYearsK + 'も一緒にやってきた{I}が、なんで〔です|だ〕。')],
         ok: [ME('書斎の引き出しに、' + V.sei + 'さんの書きかけの告白書がありました。'), ME('「灯を消したのは、' + srv.mei + 'です」。……今夜、すべてを話すつもりだったんです。')] };
       kw('k_motive', V.sei + 'の告白書');
     }
@@ -514,8 +536,8 @@
     IDS.forEach(function (id) {
       var p = P[id];
       var prof = p.age + '歳。';
-      if (p.role === 'family') prof += '霧笛荘の女主人で、' + V.sei + 'の' + famRel.name + '。赤字続きの宿を切り盛りしている。';
-      else if (p.role === 'servant') prof += V.sei + 'と若いころから一緒に灯台を守ってきた男。今は地下に住み、屋敷の雑用をしている。';
+      if (p.role === 'family') prof += '霧笛荘の' + (p.gender === 'F' ? '女主人' : '主人') + 'で、' + V.sei + 'の' + famRel.name + '。赤字続きの宿を切り盛りしている。';
+      else if (p.role === 'servant') prof += V.sei + 'と若いころから一緒に灯台を守ってきた' + (p.gender === 'F' ? '女性' : '男') + '。今は地下に住み、屋敷の雑用をしている。';
       else prof += OCC[p.occ].intro + '。' + roomOf[id].replace('room', '') + '号室に泊まっている。';
       prof += '(性格:' + PERS[p.pers].name + ')';
       var more = [];
@@ -746,7 +768,7 @@
       { clue: 'scrapbook' }, { clue: 'crewlist' },
       '(' + Object.keys(crewRel).map(function (k) { return P[k].sei; }).filter(function (s, i, a) { return a.indexOf(s) === i; }).join('……') + '……? この屋敷にいる人間と、同じ名字だ)'
     ]);
-    ex('study', 'photo', '船の写真', ['額に入った漁船の写真。船名は「第三清丸」。', '船の前で、若い' + V.sei + 'ともう一人、がっしりした男が肩を組んでいる。', '(若いころの' + srv.full + 'か)']);
+    ex('study', 'photo', '船の写真', ['額に入った漁船の写真。船名は「第三清丸」。', '船の前で、若い' + V.sei + 'ともう一人、日に焼けた若者が肩を組んでいる。', '(若いころの' + srv.full + 'か)']);
     ex('study', 'papers', '書類の山', function () {
       if (motive === 'inherit') return ['書類の山の中に、遺言書の下書きがあった。', { paper: { title: '遺言書(下書き)', text: '私、' + V.full + 'の全財産を、鴎ヶ崎灯台保存会に寄付する。\n\n昭和五十三年十一月十五日' } }, '日付は、明日だ。', { clue: 'will' }, '(' + fam.full + 'には、何も残らない……)'];
       if (motive === 'embezzle') return ['宿の帳簿。めくっていくと、毎月の売上の数字が合わない。三年にわたって、少しずつ金が消えている。', '余白に、' + V.sei + 'の字で「' + fam.mei + 'と話す。明朝、警察へ」。', { clue: 'ledger' }];
@@ -849,7 +871,7 @@
     IDS.forEach(function (id) {
       var p = P[id], s;
       if (p.role === 'family') s = [S(id, '', '{VN}の' + famRel.name + 'の、' + p.mei + '〔です|よ〕。この宿を切り盛りして〔います|る〕。'), S(id, 'sad', '{V}は……三十年、あの灯台の灯台守〔でした|だった〕。灯台が閉まってからも、灯台のそばを離れられない人で。')];
-      else if (p.role === 'servant') s = [S(id, '', p.full + '〔です|だ〕。旦那とは、若えころから一緒に灯台を守ってきた。四十年〔です|だ〕。'.replace('若えころ', p.reg === 'p' ? '若いころ' : '若えころ')), S(id, 'sad', '……旦那が、あんな死に方をする〔なんて|なんてよ〕。')];
+      else if (p.role === 'servant') s = [S(id, '', p.full + '〔です|だ〕。旦那とは、若いころから一緒に灯台を守ってきた。' + srvYearsK + '〔です|だ〕。'), S(id, 'sad', '……旦那が、あんな死に方をする〔なんて|なんてよ〕。')];
       else s = [S(id, '', p.full + '〔です|だ〕。' + OCC[p.occ].intro + '〔です|さ〕。'), S(id, '', ({ doctor: '診療所の改装のあいだ、こちらに泊まって〔います|る〕。', painter: '灯台を描きに来た〔んです|の〕。毎日、崖の上から。', developer: 'この崖一帯に、ホテルを建てる計画があって〔ね|{na}〕。{VS}さんは首を縦に振らなかった〔けれど|がね〕。', writer: '灯台を舞台にした小説を書いて〔いまして|てさ〕。取材〔です|だよ〕。', reporter: '昔の海難事故を調べて〔いまして|てね〕。記事にするつもり〔です|さ〕。' })[p.occ])];
       if (p.pers === 'nervous') s.push(S(id, 'shock', '……こ、こんなことになるなんて。眠れそうに〔ありません|ない〕。'));
       topic(id, 'who_' + id, 'あなたは?', null, s);
@@ -996,7 +1018,7 @@
     IDS.forEach(function (id) {
       var s;
       if (crewRel[id]) s = [S(id, 'shock', '……!'), S(id, 'sad', '……第三清丸には、{I}の' + crewRel[id].rel + 'が乗って〔いました|いた〕。'), S(id, '', 'それ以上は、話したくない〔です|{na}〕。')];
-      else if (id === 'kuga') s = [S(id, 'shock', '……その名前を、どこで。'), '老人は一升瓶をつかむと、湯呑みにどぼどぼと注いだ。手が震えている。', S(id, 'sad', 'あの晩のことは……話せ〔ません|{nai}〕。旦那との約束〔です|だ〕。'), { flag: 'kuga_shaken' }];
+      else if (id === 'kuga') s = [S(id, 'shock', '……その名前を、どこで。'), whoWord('kuga') + 'は一升瓶をつかむと、湯呑みにどぼどぼと注いだ。手が震えている。', S(id, 'sad', 'あの晩のことは……話せ〔ません|{nai}〕。旦那との約束〔です|だ〕。'), { flag: 'kuga_shaken' }];
       else if (id === 'fuyuko') s = [S(id, 'sad', '……その名前は、この家では口にしてはいけないもの〔でした|だった〕。'), S(id, '', 'あの夜のあと、{V}はひどくやつれて、笑わなくなった。' + srv.mei + 'さんは反対に、お酒を手放さなくなった〔んです|の〕。')];
       else s = [S(id, '', '二十年前の海難事故〔ですか|か〕。町の人間なら誰でも知って〔いますよ|るさ〕。')];
       topic(id, 'wreck_' + id, '第三清丸のこと', 'c:scrapbook', s);
@@ -1328,7 +1350,7 @@
     } else if (motive === 'forgery') {
       BREAK.push(S(culprit, 'sad', '……会社が、もうもたなかった〔んです|んだ〕。この土地が手に入らなければ、{I}はおしまいだった。'), S(culprit, 'angry', '{VS}さんは、偽の契約書に気づいて、明日の朝、警察に届けると言った。'), S(culprit, 'sad', '灯室で頭を下げた〔んです|んだ〕。それでも……「明日の朝だ」と。'));
     } else {
-      BREAK.push(S(culprit, 'sad', '……あの晩、灯を消したのは、{I}〔です|だ〕。酒を飲んで、眠りこんじまった。'), S(culprit, 'sad', '旦那は、{I}をかばって、二十年嘘をつきとおしてくれた。'), S(culprit, 'angry', 'それが今夜、全部話すと言い出した。……{I}は、怖かった〔んです|んだ〕。'), S(culprit, 'sad', '四十年……四十年、一緒にいたのに。'));
+      BREAK.push(S(culprit, 'sad', '……あの晩、灯を消したのは、{I}〔です|だ〕。酒を飲んで、眠りこんで〔しまった|しまった〕。'), S(culprit, 'sad', '旦那は、{I}をかばって、二十年嘘をつきとおしてくれた。'), S(culprit, 'angry', 'それが今夜、全部話すと言い出した。……{I}は、怖かった〔んです|んだ〕。'), S(culprit, 'sad', '四十年……四十年、一緒にいたのに。'));
     }
     if (target) BREAK.push({ if: 'f:dead_' + target, then: [S(culprit, 'sad', P[target].short + 'さんに……見られていたから〔です|だ〕。')] });
 
@@ -1456,7 +1478,10 @@
 
     DED.forEach(function (q) { q.a = q.a.filter(function (a) { return KW[a]; }); });
     CON.forEach(function (r) { r.a = r.a.filter(function (a) { return CLUES[a]; }); });
+    var LOOKS_OUT = { karasuma: { gender: cfg.det.gender === 'F' ? 'F' : 'M', age: Math.max(20, Math.min(80, Number(cfg.det.age) || 38)) }, haitani: { gender: 'M', age: 68 } };
+    IDS.forEach(function (id) { LOOKS_OUT[id] = { gender: P[id].gender, age: P[id].age }; });
     var story = {
+      LOOKS: LOOKS_OUT,
       CHARS: CHARS, LOCS: LOCS, FLOORS: ['灯台', '二階', '一階', '地下', '屋外'], START: T(22, 15), POLICE: T(30, 0), T: T,
       whereIs: whereIs, CLUES: CLUES, KW: KW, TIMELINE: TIMELINE, EXAMINE: EX, TOPICS: TOP, EVENTS: EVENTS, SNIPPETS: {},
       PROLOGUE: PRO, DEDUCTION: DED, CONFRONT: CON, WRONG: WRONG, ENDINGS: ENDINGS, BAD_FAIL: BAD_FAIL, BAD_WRONG_TAIL: BAD_WRONG_TAIL,
@@ -1484,6 +1509,6 @@
 
   window.Scenario = {
     generate: generate, defaults: defaults, randomName: randomName,
-    LOOKS: LOOKS, OCC: OCC, PERS: PERS, RELS: RELS, DIFF: DIFF, IDS: IDS
+    LOOKS: LOOKS, OCC: OCC, PERS: PERS, RELS: RELS, DIFF: DIFF, IDS: IDS, relsFor: relsFor, clampAge: clampAge
   };
 })();

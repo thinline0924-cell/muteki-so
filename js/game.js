@@ -78,7 +78,11 @@
     f.stove_out = false;
     return f;
   }
+  var lastDraw = 0;
   function frame(now) {
+    // ドット絵は 30fps で十分。描く回数を減らして、音の処理に余裕を残す
+    if (now - lastDraw < 30) { requestAnimationFrame(frame); return; }
+    lastDraw = now;
     var t = (now - t0) / 1000;
     if (Px) {
       try { Px.draw(ctx, view.scene, t, { people: view.people || [], flags: sceneFlags(), hover: hover }); }
@@ -849,8 +853,13 @@
     Snd.bgm('title'); Snd.ambient('rain');
   }
 
+  function applyLooks() {
+    if (!Px || !Px.setLook || !S.LOOKS) return;
+    Object.keys(S.LOOKS).forEach(function (id) { try { Px.setLook(id, S.LOOKS[id]); } catch (e) { /* 無視 */ } });
+  }
   async function newGame(cfg) {
     S = window.Scenario.generate(cfg);
+    applyLooks();
     st = newState();
     st.cfg = cfg;
     store.del(SAVE_KEY);
@@ -879,6 +888,7 @@
     var s = store.get(SAVE_KEY, null);
     if (!s || !s.cfg) return;
     S = window.Scenario.generate(s.cfg);
+    applyLooks();
     st = s; st.ended = false;
     $('title').classList.add('hidden');
     beginInvestigation();
@@ -951,6 +961,10 @@
     row.appendChild(el('label', null, '探偵(あなた)'));
     row.appendChild(input(c.det.sei, function (v) { c.det.sei = v || '烏丸'; }));
     row.appendChild(input(c.det.mei, function (v) { c.det.mei = v || '透'; }));
+    row.appendChild(select([['M', '男性'], ['F', '女性']], c.det.gender || 'M', function (v) { c.det.gender = v; }));
+    var dAge = input(String(c.det.age || 38), function (v) { var n = parseInt(v.replace(/\D/g, ''), 10); if (n) c.det.age = Math.max(20, Math.min(80, n)); }, 'su-in age');
+    dAge.inputMode = 'numeric'; dAge.maxLength = 2;
+    row.appendChild(dAge); row.appendChild(el('span', 'su-fixed', '歳'));
     sec.appendChild(row);
     row = el('div', 'su-row');
     row.appendChild(el('label', null, '依頼人(被害者)'));
@@ -969,10 +983,13 @@
       var L = SC.LOOKS[id], p = c.cast[id];
       var card = el('div', 'su-card');
       var face = document.createElement('canvas'); face.width = 96; face.height = 96; face.className = 'su-face';
-      try { Px.portrait(face.getContext('2d'), id, 'normal', 0); } catch (e) { /* 無視 */ }
+      function redraw() {
+        try { if (Px.setLook) Px.setLook(id, { gender: p.gender, age: p.age }); Px.portrait(face.getContext('2d'), id, 'normal', 0); } catch (e) { /* 無視 */ }
+      }
+      redraw();
       card.appendChild(face);
       var info = el('div', 'su-info');
-      info.appendChild(el('div', 'su-look', L.label + '(' + (L.gender === 'F' ? '女' : '男') + '・' + L.age + '歳)'));
+      info.appendChild(el('div', 'su-look', L.label + ' ・ ' + L.look));
       var nm = el('div', 'su-name');
       var seiIn = input(p.sei, function (v) { p.sei = v || p.sei; });
       if (id === 'fuyuko') { seiIn.disabled = true; seiIn.title = '依頼人と同じ名字'; famSei = seiIn; }
@@ -980,12 +997,29 @@
       nm.appendChild(seiIn); nm.appendChild(meiIn);
       var rnd = el('button', 'su-dice', '🎲'); rnd.title = '名前をランダムに';
       rnd.addEventListener('click', function () {
-        var n = SC.randomName(L.gender, id === 'kuga' ? 'old' : null);
+        var n = SC.randomName(p.gender, null, p.age);
         if (id !== 'fuyuko') { p.sei = n.sei; seiIn.value = n.sei; }
         p.mei = n.mei; meiIn.value = n.mei; Snd.se('cursor');
       });
       nm.appendChild(rnd);
       info.appendChild(nm);
+      // 性別と年齢
+      var r1 = el('div', 'su-row2');
+      r1.appendChild(select([['M', '男性'], ['F', '女性']], p.gender, function (v) {
+        p.gender = v;
+        if (L.role === 'family' && (!SC.RELS[p.rel] || SC.RELS[p.rel].g !== v)) p.rel = SC.relsFor(v)[0];
+        p.age = SC.clampAge(id, p.age, L.role === 'family' ? p.rel : null);
+        renderSetup();
+      }));
+      var ageIn = input(String(p.age), function (v) { var n = parseInt(v.replace(/\D/g, ''), 10); if (n) { p.age = n; } }, 'su-in age');
+      ageIn.inputMode = 'numeric'; ageIn.maxLength = 2;
+      ageIn.addEventListener('change', function () {
+        p.age = SC.clampAge(id, p.age, L.role === 'family' ? p.rel : null);
+        ageIn.value = p.age; redraw();
+      });
+      r1.appendChild(ageIn);
+      r1.appendChild(el('span', 'su-fixed', '歳(' + L.minAge + '〜' + L.maxAge + ')'));
+      info.appendChild(r1);
       var r2 = el('div', 'su-row2');
       if (L.role === 'guest') {
         r2.appendChild(select(Object.keys(SC.OCC).map(function (k) { return [k, SC.OCC[k].name]; }), p.occ, function (v) {
@@ -996,7 +1030,9 @@
           renderSetup();
         }));
       } else if (L.role === 'family') {
-        r2.appendChild(select(Object.keys(SC.RELS).map(function (k) { return [k, '依頼人の' + SC.RELS[k].name]; }), p.rel, function (v) { p.rel = v; }));
+        r2.appendChild(select(SC.relsFor(p.gender).map(function (k) { var R = SC.RELS[k]; return [k, '依頼人の' + R.name + '(' + R.min + '〜' + R.max + '歳)']; }), p.rel, function (v) {
+          p.rel = v; p.age = SC.clampAge(id, p.age, v); renderSetup();
+        }));
       } else {
         r2.appendChild(el('span', 'su-fixed', '元灯台守の下働き'));
       }
@@ -1015,7 +1051,16 @@
     var occs = Object.keys(SC.OCC).sort(function () { return Math.random() - 0.5; });
     ['shibasaki', 'chikage', 'naruse'].forEach(function (g, i) { keep.cast[g].occ = occs[i]; });
     SC.IDS.forEach(function (id) { var ks = Object.keys(SC.PERS); keep.cast[id].pers = ks[Math.floor(Math.random() * ks.length)]; });
-    keep.cast.fuyuko.rel = Object.keys(SC.RELS)[Math.floor(Math.random() * 3)];
+    SC.IDS.forEach(function (id) {
+      var L = SC.LOOKS[id], p = keep.cast[id];
+      if (Math.random() < 0.35) p.gender = p.gender === 'M' ? 'F' : 'M';
+      p.age = L.minAge + Math.floor(Math.random() * (L.maxAge - L.minAge + 1));
+      if (id === 'fuyuko') { var rs = SC.relsFor(p.gender); p.rel = rs[Math.floor(Math.random() * rs.length)]; }
+      p.age = SC.clampAge(id, p.age, id === 'fuyuko' ? p.rel : null);
+      var n = SC.randomName(p.gender, null, p.age);
+      if (id !== 'fuyuko') p.sei = n.sei;
+      p.mei = n.mei;
+    });
     renderSetup(); });
   $('setup-go').addEventListener('click', function (e) { e.stopPropagation(); Snd.se('select'); newGame(setupCfg); });
 
