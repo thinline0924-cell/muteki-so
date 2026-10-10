@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>霧笛荘事件</title>
+<meta name="description" content="登場人物を自分で決め、事件番号ごとにちがう事件を解く、一夜の推理アドベンチャー。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Shippori+Mincho+B1:wght@600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="app">
+  <div id="screen">
+    <canvas id="cv" width="320" height="180"></canvas>
+
+    <!-- 画面の上の表示(時刻・場所) -->
+    <div id="hud" class="hidden">
+      <div id="hud-time"></div>
+      <div id="hud-place"></div>
+      <div id="hud-hearts" class="hidden"></div>
+    </div>
+
+    <!-- 立ち絵(会話の顔) -->
+    <div id="portrait" class="hidden"><canvas id="pcv" width="96" height="96"></canvas></div>
+
+    <!-- 文章の枠 -->
+    <div id="msg" class="hidden">
+      <div id="msg-name" class="hidden"></div>
+      <div id="msg-text"></div>
+      <div id="msg-next">▼</div>
+    </div>
+
+    <!-- 選択肢 -->
+    <div id="choices" class="hidden"></div>
+
+    <!-- 調べる/話す などの一覧 -->
+    <div id="panel" class="hidden">
+      <div id="panel-title"></div>
+      <div id="panel-list"></div>
+      <button id="panel-close" class="pbtn">もどる</button>
+    </div>
+
+    <!-- 書類(手紙など) -->
+    <div id="paper" class="hidden"><div id="paper-inner"></div><div id="paper-hint">クリックで閉じる</div></div>
+
+    <!-- 章のタイトル -->
+    <div id="chapter" class="hidden"><div id="chapter-main"></div><div id="chapter-sub"></div></div>
+
+    <!-- 推理(穴うめ) -->
+    <div id="deduce" class="hidden">
+      <div id="deduce-head">推理</div>
+      <div id="deduce-q"></div>
+      <div id="deduce-opts"></div>
+    </div>
+
+    <!-- 手帳 -->
+    <div id="notebook" class="hidden">
+      <div id="nb-tabs">
+        <button data-tab="clues" class="nb-tab on">証拠品</button>
+        <button data-tab="people" class="nb-tab">人物</button>
+        <button data-tab="words" class="nb-tab">キーワード</button>
+        <button data-tab="timeline" class="nb-tab">時系列</button>
+        <button id="nb-close" class="nb-tab close">閉じる</button>
+      </div>
+      <div id="nb-body">
+        <div id="nb-list"></div>
+        <div id="nb-detail"></div>
+      </div>
+      <div id="nb-foot"></div>
+    </div>
+
+    <!-- 地図(移動) -->
+    <div id="map" class="hidden">
+      <div id="map-title">移動 <span>(1回 5分)</span></div>
+      <div id="map-grid"></div>
+      <button id="map-close" class="pbtn">もどる</button>
+    </div>
+
+    <!-- 設定 -->
+    <div id="settings" class="hidden">
+      <div class="set-title">設定</div>
+      <label>BGM <input type="range" id="vol-bgm" min="0" max="100"></label>
+      <label>効果音 <input type="range" id="vol-se" min="0" max="100"></label>
+      <label>環境音 <input type="range" id="vol-ambient" min="0" max="100"></label>
+      <label>文字の速さ <input type="range" id="text-speed" min="1" max="5"></label>
+      <div class="set-row">
+        <button id="set-title" class="pbtn">タイトルへもどる</button>
+        <button id="set-close" class="pbtn">閉じる</button>
+      </div>
+      <p class="set-note">進み具合は自動でこのブラウザに保存されます。</p>
+    </div>
+
+    <!-- お知らせ(手がかり入手など) -->
+    <div id="toasts"></div>
+
+    <!-- タイトル画面 -->
+    <div id="title">
+      <div id="title-v">
+        <h1 id="title-jp">霧笛荘事件</h1>
+        <div id="title-sub">ひと晩の推理録</div>
+        <div id="title-seal">霧</div>
+      </div>
+      <div id="title-en">MUTEKI-SO&nbsp;&nbsp;/&nbsp;&nbsp;a night of fog and deduction</div>
+      <div id="title-tag">事件は、毎晩ちがう。</div>
+      <div id="title-menu" class="hidden">
+        <button class="tbtn" id="t-new">人物を決めて始める</button>
+        <button class="tbtn" id="t-quick">おまかせで始める</button>
+        <button class="tbtn" id="t-cont">つづきから</button>
+        <button class="tbtn" id="t-end">記録</button>
+        <button class="tbtn" id="t-set">設定</button>
+      </div>
+      <div id="title-press">― クリックして始める ―</div>
+      <div id="title-note">音が出ます ・ ヘッドホン推奨 ・ 1事件 約40〜60分</div>
+    </div>
+
+    <!-- 事件の準備(人物設定) -->
+    <div id="setup" class="hidden">
+      <div id="setup-head">事件の準備<span>登場人物を決めてください。決めなかったところは、そのままで遊べます。</span></div>
+      <div id="setup-body"></div>
+      <div id="setup-foot">
+        <button class="pbtn" id="setup-back">もどる</button>
+        <button class="pbtn" id="setup-random">ぜんぶおまかせにする</button>
+        <button class="pbtn go" id="setup-go">この設定で事件を作る ▶</button>
+      </div>
+    </div>
+
+    <div id="fade"></div>
+    <div id="flash"></div>
+  </div>
+
+  <!-- 下のボタン -->
+  <div id="cmdbar" class="hidden">
+    <button class="cmd" data-cmd="look"><b>調べる</b><i>5分</i></button>
+    <button class="cmd" data-cmd="talk"><b>話す</b><i>10分</i></button>
+    <button class="cmd" data-cmd="move"><b>移動</b><i>5分</i></button>
+    <button class="cmd" data-cmd="note"><b>手帳</b><i>&nbsp;</i></button>
+    <button class="cmd accent" data-cmd="solve"><b>推理する</b><i>&nbsp;</i></button>
+    <button class="cmd small" data-cmd="settings"><b>⚙</b><i>&nbsp;</i></button>
+  </div>
+</div>
+
+<script src="js/audio.js"></script>
+<script src="js/pixel.js"></script>
+<script src="js/scenario.js"></script>
+<script src="js/game.js"></script>
+</body>
+</html>

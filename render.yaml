@@ -1,0 +1,7 @@
+# Render Blueprint:静的サイトとして公開する(ビルドなし)
+services:
+  - type: web
+    name: muteki-so
+    runtime: static
+    buildCommand: ""
+    staticPublishPath: .
