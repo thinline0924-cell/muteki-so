@@ -80,6 +80,9 @@ class _WorldCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final next = game.continueStage;
+    // ワールドの最初のステージに必要な星(足りなければ鍵の札を出す)
+    final need = pack.stages.isEmpty ? 0 : pack.stages.first.unlock.minTotalStars;
+    final lockedByStars = need > game.progress.totalStars;
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
       decoration: BoxDecoration(color: Palette.cream, borderRadius: BorderRadius.circular(20)),
@@ -110,6 +113,26 @@ class _WorldCard extends StatelessWidget {
                         pack.name,
                         style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
                       ),
+                      if (lockedByStars)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.lock_rounded, size: 14, color: Palette.inkSoft),
+                              const SizedBox(width: 4),
+                              Flexible(
+                                child: Text(
+                                  '星を $need 個集めると開きます(いま ${game.progress.totalStars} 個)',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: Palette.inkSoft,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                     ],
                   ),
                 ),
@@ -170,6 +193,15 @@ class _StageButton extends StatelessWidget {
   final bool cleared;
   final bool isNext;
 
+  String _lockedMessage(BuildContext context) {
+    final game = GameScope.of(context);
+    final after = stage.unlock.afterStage;
+    if (after != null && !game.progress.isCleared(after)) {
+      return 'ステージ $after をクリアすると遊べます';
+    }
+    return '星を ${stage.unlock.minTotalStars} 個集めると遊べます(いま ${game.progress.totalStars} 個)';
+  }
+
   @override
   Widget build(BuildContext context) {
     final label = unlocked
@@ -191,7 +223,7 @@ class _StageButton extends StatelessWidget {
                         .push(MaterialPageRoute<void>(builder: (_) => PuzzleScreen(stage: stage)))
               : () => ScaffoldMessenger.of(context)
                   ..hideCurrentSnackBar()
-                  ..showSnackBar(const SnackBar(content: Text('前のステージをクリアすると遊べます'))),
+                  ..showSnackBar(SnackBar(content: Text(_lockedMessage(context)))),
           child: Container(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(12),

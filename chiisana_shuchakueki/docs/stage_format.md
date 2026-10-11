@@ -52,7 +52,7 @@ assets/stages/
 | grid | ○ | 盤面。`height` 行、各行に `width` 個の記号をスペース区切りで書く |
 | stars | ○ | `three`:★3 になる最大手数(1 以上)、`two`:★2 になる最大手数(three 以上) |
 | reward | ○ | `coins`:毎回のコイン、`firstClearBonus`:初回だけの追加コイン(0 以上) |
-| tutorial | | `rotate` / `curve` / `stars` / `fixed` / `obstacle`(画面上の説明が出る) |
+| tutorial | | `rotate` / `curve` / `stars` / `fixed` / `obstacle` / `cross` / `tee`(初めて遊ぶときに説明が出る。`rotate` は指で教えるモード) |
 | unlock | | `afterStage`:クリアが必要なステージ ID、`minTotalStars`:必要な合計の星 |
 
 ## 3. マスの記号
@@ -96,8 +96,19 @@ assets/stages/
 ## 6. ステージの作り方
 
 `tool/build_stages.dart` にステージの一覧があります。手作りの盤面は grid を直接書き、
-自動生成のものは条件(経路の長さ、まどわせる線路の数、障害物の数、固定タイルの数、
-手数の範囲)と乱数の種(seed)を書きます。
+自動生成のものは条件と乱数の種(seed)を書きます。
+
+| 条件 | 意味 |
+|---|---|
+| width / height | 盤面の大きさ |
+| minPath / maxPath | 正解の経路の長さ(駅を除くマス数) |
+| minTurns | 曲がる回数の最低 |
+| crossings | 十字で交差する回数 |
+| pathTees | 経路の上に置く T字の数 |
+| decoys / decoyTees | まどわせる線路の数 / その中に T字を混ぜるか |
+| obstacles | 障害物の数 |
+| fixedPath | 正しい向きで固定する経路上の線路の数 |
+| minMoves / maxMoves | 最少手数の範囲(外れたら作り直す) |
 
 ```
 cd chiisana_shuchakueki

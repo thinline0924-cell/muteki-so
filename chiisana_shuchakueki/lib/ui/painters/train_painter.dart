@@ -13,7 +13,12 @@ class TrainPainter extends CustomPainter {
     required this.cellSize,
     this.crashed = false,
     this.smokePhase = 0,
+    this.body = Palette.train,
+    this.accent = Palette.trainAccent,
   });
+
+  final Color body;
+  final Color accent;
 
   final TrackGeometry geometry;
 
@@ -58,12 +63,12 @@ class TrainPainter extends CustomPainter {
       Rect.fromCenter(center: Offset.zero, width: l, height: w),
       Radius.circular(s * 0.07),
     );
-    c.drawRRect(body, Paint()..color = Palette.trainDark);
-    c.drawRRect(body.deflate(s * 0.022), Paint()..color = Palette.train);
+    c.drawRRect(body, Paint()..color = darken(this.body, 0.3));
+    c.drawRRect(body.deflate(s * 0.022), Paint()..color = this.body);
     // 屋根の帯
     c.drawRect(
       Rect.fromCenter(center: Offset.zero, width: l * 0.8, height: w * 0.32),
-      Paint()..color = const Color(0xFFF3E6CF),
+      Paint()..color = accent,
     );
     if (loco) {
       // 先頭の窓とライト
@@ -111,5 +116,7 @@ class TrainPainter extends CustomPainter {
       old.geometry != geometry ||
       old.cellSize != cellSize ||
       old.crashed != crashed ||
-      old.smokePhase != smokePhase;
+      old.smokePhase != smokePhase ||
+      old.body != body ||
+      old.accent != accent;
 }

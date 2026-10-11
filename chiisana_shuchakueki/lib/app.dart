@@ -3,7 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'game/game_controller.dart';
-import 'game/stage_loader.dart';
+import 'game/progress_store.dart';
+import 'game/sound.dart';
 import 'ui/game_scope.dart';
 import 'ui/screens/title_screen.dart';
 import 'ui/theme.dart';
@@ -21,13 +22,14 @@ class ChiisanaApp extends StatefulWidget {
   State<ChiisanaApp> createState() => _ChiisanaAppState();
 }
 
-class _ChiisanaAppState extends State<ChiisanaApp> {
+class _ChiisanaAppState extends State<ChiisanaApp> with WidgetsBindingObserver {
   GameController? _game;
   Object? _error;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     if (widget.controller != null) {
       _game = widget.controller;
     } else {
@@ -37,18 +39,45 @@ class _ChiisanaAppState extends State<ChiisanaApp> {
 
   Future<void> _load() async {
     try {
-      final loaded = await loadStages(widget.bundle ?? rootBundle);
-      for (final e in loaded.errors) {
+      final game = await GameController.load(
+        bundle: widget.bundle ?? rootBundle,
+        store: PrefsProgressStore(),
+        sound: AudioSoundService(),
+      );
+      for (final e in game.loaded.errors) {
         debugPrint('ステージ読みこみ: $e');
       }
-      if (mounted) setState(() => _game = GameController(loaded));
+      game.sound.startBgm();
+      if (mounted) {
+        setState(() => _game = game);
+      } else {
+        game.dispose();
+      }
     } catch (e) {
       if (mounted) setState(() => _error = e);
     }
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final game = _game;
+    if (game == null) return;
+    switch (state) {
+      case AppLifecycleState.paused:
+      case AppLifecycleState.detached:
+      case AppLifecycleState.hidden:
+        game.sound.onPause();
+        game.save();
+      case AppLifecycleState.resumed:
+        game.sound.onResume();
+      case AppLifecycleState.inactive:
+        break;
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     if (widget.controller == null) _game?.dispose();
     super.dispose();
   }

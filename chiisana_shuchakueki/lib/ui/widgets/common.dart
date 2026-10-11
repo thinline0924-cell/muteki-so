@@ -15,8 +15,12 @@ class ChunkyButton extends StatelessWidget {
     this.height = 56,
     this.fontSize = 19,
     this.badge,
+    this.badgeColor,
     this.muted = false,
   });
+
+  /// 札の色(null ならクリーム色)
+  final Color? badgeColor;
 
   /// 押せるが、まだ使えないことを示す灰色の見た目にする
   final bool muted;
@@ -90,16 +94,16 @@ class ChunkyButton extends StatelessWidget {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(
-                  color: Palette.cream,
+                  color: badgeColor ?? Palette.cream,
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(color: Palette.inkSoft.withValues(alpha: 0.4)),
                 ),
                 child: Text(
                   badge!,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
-                    color: Palette.inkSoft,
+                    color: badgeColor == null ? Palette.inkSoft : Colors.white,
                   ),
                 ),
               ),

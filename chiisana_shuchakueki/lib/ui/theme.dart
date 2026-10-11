@@ -31,6 +31,7 @@ abstract final class Palette {
   static const plateFixed = Color(0xFFB0A387);
   static const train = Color(0xFFD9473B);
   static const trainDark = Color(0xFF9E2F27);
+  static const trainAccent = Color(0xFFF3E6CF);
   static const roof = Color(0xFFC8553D);
   static const roofGoal = Color(0xFF3E7CB1);
   static const water = Color(0xFF6FB6D9);
@@ -45,6 +46,15 @@ abstract final class Palette {
   static const hill = Color(0xFF6FA75A);
   static const hillFar = Color(0xFF8FBF8A);
 }
+
+/// "#RRGGBB" を色にする。読めなければ [fallback]。
+Color colorOf(String? hex, Color fallback) {
+  if (hex == null || !RegExp(r'^#[0-9A-Fa-f]{6}$').hasMatch(hex)) return fallback;
+  return Color(0xFF000000 | int.parse(hex.substring(1), radix: 16));
+}
+
+/// 少し暗くした色
+Color darken(Color c, [double amount = 0.3]) => Color.lerp(c, Colors.black, amount)!;
 
 ThemeData buildTheme() {
   final scheme = ColorScheme.fromSeed(

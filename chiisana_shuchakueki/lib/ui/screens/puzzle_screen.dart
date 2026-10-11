@@ -1,9 +1,11 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
+import '../../game/catalog.dart';
+import '../../game/game_controller.dart';
 import '../../game/progress.dart';
+import '../../game/sound.dart';
 import '../../puzzle/board.dart';
 import '../../puzzle/route.dart';
 import '../../puzzle/session.dart';
@@ -17,6 +19,7 @@ import '../widgets/board_view.dart';
 import '../widgets/clear_overlay.dart';
 import '../widgets/common.dart';
 import 'stage_select_screen.dart';
+import 'town_screen.dart';
 
 enum _Phase { idle, running, failed, cleared }
 
@@ -47,7 +50,18 @@ class _PuzzleScreenState extends State<PuzzleScreen> with TickerProviderStateMix
   Hint? _hint;
   int _hintTaps = 0;
   ClearResult? _clear;
-  late bool _showTutorial = tutorialMessage(widget.stage.tutorial) != null;
+  List<CollectibleItem> _newItems = const [];
+  bool _showTutorial = false;
+
+  /// 最初のステージの手取り足取りモード(次にタップするマスを指で示す)
+  bool _guided = false;
+  late final AnimationController _pulse = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 700),
+  );
+  bool _started = false;
+
+  GameController get _game => GameScope.of(context);
 
   @override
   void initState() {
@@ -56,8 +70,21 @@ class _PuzzleScreenState extends State<PuzzleScreen> with TickerProviderStateMix
     _smoke.addListener(() {
       if (_phase == _Phase.running) setState(() {});
     });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_started) return;
+    _started = true;
+    final game = _game;
+    final tut = widget.stage.tutorial;
+    final unseen = tut != null && !game.tutorialSeen(tut);
+    _showTutorial = unseen && tutorialMessage(tut) != null;
+    _guided = unseen && tut == 'rotate';
+    if (_guided) _updateGuide();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) GameScope.of(context).markPlayed(widget.stage);
+      if (mounted) _game.markPlayed(widget.stage);
     });
   }
 
@@ -65,7 +92,24 @@ class _PuzzleScreenState extends State<PuzzleScreen> with TickerProviderStateMix
   void dispose() {
     _run.dispose();
     _smoke.dispose();
+    _pulse.dispose();
     super.dispose();
+  }
+
+  /// 手取り足取りモード:次に回すマスを示す。つながったら「出発」を光らせる
+  void _updateGuide() {
+    if (!_guided) return;
+    final h = Solver.hint(_session.board);
+    _hint = h;
+    _hintTaps = h?.taps ?? 0;
+    final pulseDepart = h == null && RouteSimulator.run(_session.board).isSuccess;
+    if (pulseDepart && !_pulse.isAnimating) {
+      _pulse.repeat(reverse: true);
+    } else if (!pulseDepart && _pulse.isAnimating) {
+      _pulse
+        ..stop()
+        ..value = 0;
+    }
   }
 
   bool get _locked => _phase == _Phase.running || _phase == _Phase.cleared;
@@ -81,7 +125,9 @@ class _PuzzleScreenState extends State<PuzzleScreen> with TickerProviderStateMix
   void _onTapTile(Pos p) {
     if (_locked) return;
     if (!_session.rotate(p)) return;
-    HapticFeedback.selectionClick();
+    _game
+      ..play(Sfx.tap)
+      ..vibrate(Haptic.selection);
     setState(() {
       if (_phase == _Phase.failed) _backToStation();
       if (_hint != null) {
@@ -91,6 +137,7 @@ class _PuzzleScreenState extends State<PuzzleScreen> with TickerProviderStateMix
           _hint = null;
         }
       }
+      _updateGuide();
     });
   }
 
@@ -98,8 +145,10 @@ class _PuzzleScreenState extends State<PuzzleScreen> with TickerProviderStateMix
     if (_locked) return;
     setState(() {
       if (_session.undo()) {
+        _game.play(Sfx.button);
         _hint = null;
         if (_phase == _Phase.failed) _backToStation();
+        _updateGuide();
       }
     });
   }
@@ -108,8 +157,10 @@ class _PuzzleScreenState extends State<PuzzleScreen> with TickerProviderStateMix
     if (_locked) return;
     setState(() {
       _session.reset();
+      _game.play(Sfx.button);
       _hint = null;
       _backToStation();
+      _updateGuide();
     });
   }
 
@@ -128,6 +179,7 @@ class _PuzzleScreenState extends State<PuzzleScreen> with TickerProviderStateMix
         );
       return;
     }
+    _game.play(Sfx.button);
     setState(() {
       if (_phase == _Phase.failed) _backToStation();
       _hint = h;
@@ -139,7 +191,12 @@ class _PuzzleScreenState extends State<PuzzleScreen> with TickerProviderStateMix
     if (_locked) return;
     final result = _session.depart();
     if (result == null) return;
-    HapticFeedback.lightImpact();
+    _game
+      ..play(Sfx.depart)
+      ..vibrate(Haptic.light);
+    _pulse
+      ..stop()
+      ..value = 0;
     setState(() {
       _phase = _Phase.running;
       _result = result;
@@ -157,15 +214,29 @@ class _PuzzleScreenState extends State<PuzzleScreen> with TickerProviderStateMix
     _smoke.stop();
     if (!mounted) return;
     _session.finishRun();
+    final game = _game;
     if (result.isSuccess) {
-      HapticFeedback.mediumImpact();
-      final clear = GameScope.of(context).recordClear(widget.stage, _session.moves);
-      setState(() => _phase = _Phase.cleared);
+      game
+        ..play(Sfx.arrive)
+        ..vibrate(Haptic.medium);
+      final clear = game.recordClear(widget.stage, _session.moves);
+      final tut = widget.stage.tutorial;
+      if (tut != null) game.markTutorialSeen(tut);
+      setState(() {
+        _phase = _Phase.cleared;
+        _guided = false;
+        _hint = null;
+      });
       await Future<void>.delayed(const Duration(milliseconds: 350));
       if (!mounted) return;
-      setState(() => _clear = clear);
+      setState(() {
+        _clear = clear.result;
+        _newItems = clear.newItems;
+      });
     } else {
-      HapticFeedback.heavyImpact();
+      game
+        ..play(Sfx.fail)
+        ..vibrate(Haptic.heavy);
       setState(() => _phase = _Phase.failed);
     }
   }
@@ -174,6 +245,7 @@ class _PuzzleScreenState extends State<PuzzleScreen> with TickerProviderStateMix
     setState(() {
       _session = PuzzleSession(widget.stage.board);
       _clear = null;
+      _newItems = const [];
       _hint = null;
       _backToStation();
     });
@@ -190,6 +262,12 @@ class _PuzzleScreenState extends State<PuzzleScreen> with TickerProviderStateMix
     Navigator.of(context)
       ..popUntil((r) => r.isFirst)
       ..push(MaterialPageRoute<void>(builder: (_) => const StageSelectScreen()));
+  }
+
+  void _goTown() {
+    Navigator.of(context)
+      ..popUntil((r) => r.isFirst)
+      ..push(MaterialPageRoute<void>(builder: (_) => const TownScreen()));
   }
 
   double get _trainFront {
@@ -245,7 +323,10 @@ class _PuzzleScreenState extends State<PuzzleScreen> with TickerProviderStateMix
                           _TutorialCard(
                             compact: compact,
                             text: tutorial,
-                            onClose: () => setState(() => _showTutorial = false),
+                            onClose: () {
+                              game.play(Sfx.button);
+                              setState(() => _showTutorial = false);
+                            },
                           ),
                         Expanded(
                           child: BoardView(
@@ -254,7 +335,10 @@ class _PuzzleScreenState extends State<PuzzleScreen> with TickerProviderStateMix
                             enabled: !_locked,
                             hint: _hint?.pos,
                             hintTaps: _hintTaps,
+                            pointer: _guided,
                             train: TrainView(
+                              body: colorOf(game.train.colors['body'], Palette.train),
+                              accent: colorOf(game.train.colors['accent'], Palette.trainAccent),
                               geometry: _geometry,
                               front: _trainFront,
                               crashed: _phase == _Phase.failed,
@@ -272,16 +356,24 @@ class _PuzzleScreenState extends State<PuzzleScreen> with TickerProviderStateMix
                           text: switch (_phase) {
                             _Phase.running => '出発進行!',
                             _Phase.cleared => '到着!',
+                            _ when _guided && _hint != null => '光っている線路をタップしよう',
+                            _ when _guided => '線路がつながった!「出発」を押そう',
                             _ => _session.moves == 0 ? '線路をタップして回そう' : 'つながったら「出発」!',
                           },
                         ),
                         SizedBox(height: compact ? 6 : 10),
-                        ChunkyButton(
-                          key: const ValueKey('depart'),
-                          height: compact ? 48 : 56,
-                          label: _phase == _Phase.failed ? 'もう一度出発' : '出発',
-                          icon: Icons.play_arrow_rounded,
-                          onPressed: _locked ? null : _depart,
+                        ScaleTransition(
+                          scale: Tween(
+                            begin: 1.0,
+                            end: 1.06,
+                          ).animate(CurvedAnimation(parent: _pulse, curve: Curves.easeInOut)),
+                          child: ChunkyButton(
+                            key: const ValueKey('depart'),
+                            height: compact ? 48 : 56,
+                            label: _phase == _Phase.failed ? 'もう一度出発' : '出発',
+                            icon: Icons.play_arrow_rounded,
+                            onPressed: _locked ? null : _depart,
+                          ),
                         ),
                         SizedBox(height: compact ? 6 : 10),
                         Row(
@@ -328,9 +420,11 @@ class _PuzzleScreenState extends State<PuzzleScreen> with TickerProviderStateMix
               child: ClearOverlay(
                 stage: stage,
                 result: _clear!,
+                newItems: _newItems,
                 onRetry: _retry,
                 onNext: nextUnlocked ? () => _goNext(next) : null,
                 onStageSelect: _goStageSelect,
+                onTown: _goTown,
               ),
             ),
         ],

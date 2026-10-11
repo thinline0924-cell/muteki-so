@@ -22,6 +22,7 @@ class GenParams {
     this.decoyTees = false,
     this.obstacles = 3,
     this.fixedPath = 0,
+    this.pathTees = 0,
     required this.minMoves,
     required this.maxMoves,
   });
@@ -44,6 +45,9 @@ class GenParams {
 
   /// 正しい向きで固定する経路上のタイル数
   final int fixedPath;
+
+  /// 経路の上に置く T字の数(直線、または右へ曲がるカーブを T字に替える)
+  final int pathTees;
   final int minMoves;
   final int maxMoves;
 }
@@ -147,6 +151,27 @@ Generated? _tryOnce(GenParams p, Random rng) {
     final r = [0, 1, 2, 3].firstWhere((r) => DirMask.rotateCw(kind.baseMask, r) == mask);
     put(cell.pos, Tile(kind, rotation: r));
     pathTiles.add(cell.pos);
+  }
+
+  // T字に替えられるマス:直線(横に枝を足す)か、右へ曲がるカーブ(左に枝を足す)
+  if (p.pathTees > 0) {
+    final candidates = [
+      for (final cell in path)
+        if (!crosses.contains(cell.pos) &&
+            (cell.exit == cell.entry.opposite || cell.exit == cell.entry.opposite.right))
+          cell,
+    ]..shuffle(rng);
+    if (candidates.length < p.pathTees) return null;
+    for (final cell in candidates.take(p.pathTees)) {
+      final heading = cell.entry.opposite;
+      final extra = cell.exit == heading
+          ? (rng.nextBool() ? heading.left : heading.right)
+          : heading.left;
+      final mask = cell.entry.bit | cell.exit.bit | extra.bit;
+      final r = [0, 1, 2, 3].firstWhere((r) => DirMask.rotateCw(TileKind.tee.baseMask, r) == mask);
+      if (routeExit(TileKind.tee, mask, cell.entry) != cell.exit) return null;
+      put(cell.pos, Tile(TileKind.tee, rotation: r));
+    }
   }
 
   // 固定タイル(正しい向きのまま回せない)

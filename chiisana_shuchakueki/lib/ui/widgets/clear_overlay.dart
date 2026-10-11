@@ -1,9 +1,17 @@
 import 'package:flutter/material.dart';
 
+import 'dart:async';
+
+import 'package:flutter/scheduler.dart';
+
+import '../../game/catalog.dart';
 import '../../game/progress.dart';
+import '../../game/sound.dart';
 import '../../puzzle/stage.dart';
+import '../game_scope.dart';
 import '../theme.dart';
 import 'common.dart';
+import 'new_items.dart';
 
 /// クリア画面(パズル画面の上に重ねる)。
 class ClearOverlay extends StatefulWidget {
@@ -14,7 +22,13 @@ class ClearOverlay extends StatefulWidget {
     required this.onRetry,
     required this.onNext,
     required this.onStageSelect,
+    required this.onTown,
+    this.newItems = const [],
   });
+
+  /// このクリアで新しく手に入れたもの
+  final List<CollectibleItem> newItems;
+  final VoidCallback onTown;
 
   final StageDefinition stage;
   final ClearResult result;
@@ -33,9 +47,36 @@ class _ClearOverlayState extends State<ClearOverlay> with SingleTickerProviderSt
     vsync: this,
     duration: const Duration(milliseconds: 1400),
   )..forward();
+  final List<Timer> _timers = [];
+
+  @override
+  void initState() {
+    super.initState();
+    // 星が出るたびに音を鳴らす(星のアニメーションと同じ時間に合わせる)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final game = GameScope.of(context);
+      final scale = timeDilation;
+      for (var i = 0; i < widget.result.stars; i++) {
+        _timers.add(
+          Timer(Duration(milliseconds: ((280 + i * 250) * scale).round()), () {
+            if (mounted) game.play(Sfx.star);
+          }),
+        );
+      }
+      _timers.add(
+        Timer(Duration(milliseconds: ((300 + 3 * 250) * scale).round()), () {
+          if (mounted) game.play(Sfx.coin);
+        }),
+      );
+    });
+  }
 
   @override
   void dispose() {
+    for (final t in _timers) {
+      t.cancel();
+    }
     _c.dispose();
     super.dispose();
   }
@@ -78,6 +119,28 @@ class _ClearOverlayState extends State<ClearOverlay> with SingleTickerProviderSt
                       ),
                     const SizedBox(height: 16),
                     _rewards(r),
+                    if (widget.newItems.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      const Text(
+                        '新しく手に入れたもの',
+                        style: TextStyle(color: Palette.star, fontWeight: FontWeight.w900),
+                      ),
+                      const SizedBox(height: 6),
+                      Wrap(
+                        alignment: WrapAlignment.center,
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          for (final i in widget.newItems)
+                            NewItemChip(
+                              key: ValueKey('new-${i.id}'),
+                              item: i,
+                              animate: true,
+                              size: 52,
+                            ),
+                        ],
+                      ),
+                    ],
                     const SizedBox(height: 18),
                     if (widget.onNext != null) ...[
                       ChunkyButton(
@@ -86,7 +149,7 @@ class _ClearOverlayState extends State<ClearOverlay> with SingleTickerProviderSt
                         icon: Icons.play_arrow_rounded,
                         onPressed: widget.onNext,
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 10),
                     ] else
                       const Padding(
                         padding: EdgeInsets.only(bottom: 12),
@@ -95,6 +158,17 @@ class _ClearOverlayState extends State<ClearOverlay> with SingleTickerProviderSt
                           style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
                         ),
                       ),
+                    ChunkyButton(
+                      key: const ValueKey('town'),
+                      label: '町へ戻る',
+                      icon: Icons.home_rounded,
+                      color: Palette.green,
+                      shadow: Palette.greenDark,
+                      fontSize: 17,
+                      height: 50,
+                      onPressed: widget.onTown,
+                    ),
+                    const SizedBox(height: 10),
                     Row(
                       children: [
                         Expanded(
@@ -176,7 +250,8 @@ class _ClearOverlayState extends State<ClearOverlay> with SingleTickerProviderSt
               ),
               _rewardItem(
                 const Icon(Icons.monetization_on_rounded, color: Palette.coin, size: 34),
-                '${r.coins}',
+                null,
+                count: r.coins,
               ),
               if (r.isFirstClear)
                 _rewardItem(
@@ -190,13 +265,25 @@ class _ClearOverlayState extends State<ClearOverlay> with SingleTickerProviderSt
     );
   }
 
-  Widget _rewardItem(Widget icon, String text) => Column(
-    children: [
-      icon,
-      const SizedBox(height: 2),
-      Text(text, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
-    ],
-  );
+  /// [count] があれば 0 から数え上げて表示する
+  Widget _rewardItem(Widget icon, String? text, {int? count}) {
+    const style = TextStyle(fontWeight: FontWeight.w800, fontSize: 15);
+    return Column(
+      children: [
+        icon,
+        const SizedBox(height: 2),
+        if (count != null)
+          TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0, end: count.toDouble()),
+            duration: const Duration(milliseconds: 900),
+            curve: const Interval(0.4, 1, curve: Curves.easeOut),
+            builder: (context, v, _) => Text('${v.round()}', style: style),
+          )
+        else
+          Text(text ?? '', style: style),
+      ],
+    );
+  }
 }
 
 class _Ribbon extends StatelessWidget {

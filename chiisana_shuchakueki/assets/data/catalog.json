@@ -1,0 +1,514 @@
+{
+  "version": 1,
+  "items": [
+    {
+      "id": "house_small",
+      "type": "building",
+      "name": "小さな家",
+      "description": "駅前にたたずむ、かわいい家。煙突から白い煙がのぼる。",
+      "unlock": {
+        "kind": "purchase"
+      },
+      "price": 150,
+      "size": "large",
+      "art": "house_small"
+    },
+    {
+      "id": "house_blue",
+      "type": "building",
+      "name": "青い屋根の家",
+      "description": "海の色をまねした屋根。窓をあけると汽笛が聞こえる。",
+      "unlock": {
+        "kind": "purchase"
+      },
+      "price": 200,
+      "size": "large",
+      "art": "house_blue"
+    },
+    {
+      "id": "shop",
+      "type": "building",
+      "name": "商店",
+      "description": "なんでもそろう町の商店。おつかいはここで。",
+      "unlock": {
+        "kind": "purchase"
+      },
+      "price": 300,
+      "size": "large",
+      "art": "shop"
+    },
+    {
+      "id": "cafe",
+      "type": "building",
+      "name": "カフェ",
+      "description": "旅のひとやすみにぴったりの、小さなカフェ。",
+      "unlock": {
+        "kind": "purchase"
+      },
+      "price": 450,
+      "size": "large",
+      "art": "cafe"
+    },
+    {
+      "id": "bakery",
+      "type": "building",
+      "name": "パン屋",
+      "description": "朝いちばんの列車に合わせて、パンが焼きあがる。",
+      "unlock": {
+        "kind": "purchase"
+      },
+      "price": 500,
+      "size": "large",
+      "art": "bakery"
+    },
+    {
+      "id": "clocktower",
+      "type": "building",
+      "name": "時計台",
+      "description": "町のまんなかで時を刻む。列車はいつも時間どおり。",
+      "unlock": {
+        "kind": "purchase"
+      },
+      "price": 900,
+      "size": "large",
+      "art": "clocktower"
+    },
+    {
+      "id": "mailbox",
+      "type": "decoration",
+      "name": "ポスト",
+      "description": "遠くの町へ、手紙を届けよう。",
+      "unlock": {
+        "kind": "purchase"
+      },
+      "price": 40,
+      "size": "small",
+      "art": "mailbox"
+    },
+    {
+      "id": "tree",
+      "type": "decoration",
+      "name": "木",
+      "description": "木かげで休むと、線路の音がよく聞こえる。",
+      "unlock": {
+        "kind": "purchase"
+      },
+      "price": 50,
+      "size": "small",
+      "art": "tree"
+    },
+    {
+      "id": "flowerbed",
+      "type": "decoration",
+      "name": "花壇",
+      "description": "駅前を彩る、季節の花壇。",
+      "unlock": {
+        "kind": "purchase"
+      },
+      "price": 60,
+      "size": "small",
+      "art": "flowerbed"
+    },
+    {
+      "id": "bench",
+      "type": "decoration",
+      "name": "ベンチ",
+      "description": "列車を待つあいだに、ひと休み。",
+      "unlock": {
+        "kind": "purchase"
+      },
+      "price": 70,
+      "size": "small",
+      "art": "bench"
+    },
+    {
+      "id": "streetlamp",
+      "type": "decoration",
+      "name": "街灯",
+      "description": "夜の町をやさしく照らす。",
+      "unlock": {
+        "kind": "purchase"
+      },
+      "price": 80,
+      "size": "small",
+      "art": "streetlamp"
+    },
+    {
+      "id": "pond",
+      "type": "decoration",
+      "name": "池",
+      "description": "小さな池。ときどき、かもが遊びに来る。",
+      "unlock": {
+        "kind": "purchase"
+      },
+      "price": 120,
+      "size": "small",
+      "art": "pond"
+    },
+    {
+      "id": "fountain",
+      "type": "decoration",
+      "name": "噴水",
+      "description": "広場の噴水。子どもたちの待ち合わせ場所。",
+      "unlock": {
+        "kind": "purchase"
+      },
+      "price": 400,
+      "size": "small",
+      "art": "fountain"
+    },
+    {
+      "id": "train_hidamari",
+      "type": "train",
+      "name": "ひだまり号",
+      "description": "のんびり走る、みんなの人気者。小さな終着駅のシンボル。",
+      "unlock": {
+        "kind": "start"
+      },
+      "art": "train",
+      "colors": {
+        "body": "#D9473B",
+        "accent": "#F3E6CF"
+      }
+    },
+    {
+      "id": "train_sakura",
+      "type": "train",
+      "name": "さくら号",
+      "description": "春になると、桜の花びらを乗せて走る。",
+      "unlock": {
+        "kind": "stars",
+        "value": 20
+      },
+      "art": "train",
+      "colors": {
+        "body": "#E98AA5",
+        "accent": "#FFF4F6"
+      }
+    },
+    {
+      "id": "train_midori",
+      "type": "train",
+      "name": "みどり号",
+      "description": "海辺の線路を走りぬけた、森の色の列車。",
+      "unlock": {
+        "kind": "clear",
+        "stage": "2-10"
+      },
+      "art": "train",
+      "colors": {
+        "body": "#3F8A52",
+        "accent": "#E8F2D0"
+      }
+    },
+    {
+      "id": "train_yuki",
+      "type": "train",
+      "name": "ゆき号",
+      "description": "白い車体に青い帯。雪の朝でも元気に走る。",
+      "unlock": {
+        "kind": "stars",
+        "value": 60
+      },
+      "art": "train",
+      "colors": {
+        "body": "#EEF2F5",
+        "accent": "#3E7CB1"
+      }
+    },
+    {
+      "id": "train_asahi",
+      "type": "train",
+      "name": "あさひ号",
+      "description": "朝日の色の車体で、町いちばんの早起き。",
+      "unlock": {
+        "kind": "clear",
+        "stage": "4-10"
+      },
+      "art": "train",
+      "colors": {
+        "body": "#F2B134",
+        "accent": "#8B4A2B"
+      }
+    },
+    {
+      "id": "train_tsubame",
+      "type": "train",
+      "name": "つばめ号",
+      "description": "黒い車体の特急。でも終着駅ではのんびりする。",
+      "unlock": {
+        "kind": "stars",
+        "value": 120
+      },
+      "art": "train",
+      "colors": {
+        "body": "#2E3438",
+        "accent": "#C8553D"
+      }
+    },
+    {
+      "id": "station_wood",
+      "type": "station",
+      "name": "木造の駅舎",
+      "description": "最初の駅舎。木のぬくもりが落ち着く。",
+      "unlock": {
+        "kind": "start"
+      },
+      "art": "station",
+      "colors": {
+        "roof": "#C8553D",
+        "wall": "#F5E6C8"
+      }
+    },
+    {
+      "id": "station_brick",
+      "type": "station",
+      "name": "レンガの駅舎",
+      "description": "町がにぎわいはじめたしるし。",
+      "unlock": {
+        "kind": "town",
+        "value": 4
+      },
+      "art": "station",
+      "colors": {
+        "roof": "#6B4B33",
+        "wall": "#C0704A"
+      }
+    },
+    {
+      "id": "station_white",
+      "type": "station",
+      "name": "白い駅舎",
+      "description": "海に映える、白い壁の駅舎。",
+      "unlock": {
+        "kind": "town",
+        "value": 9
+      },
+      "art": "station",
+      "colors": {
+        "roof": "#3E7CB1",
+        "wall": "#FFFFFF"
+      }
+    },
+    {
+      "id": "station_green",
+      "type": "station",
+      "name": "みどりの駅舎",
+      "description": "星をたくさん集めた人だけの、特別な駅舎。",
+      "unlock": {
+        "kind": "stars",
+        "value": 100
+      },
+      "art": "station",
+      "colors": {
+        "roof": "#3F8A52",
+        "wall": "#F2E3C2"
+      }
+    },
+    {
+      "id": "resident_stationmaster",
+      "type": "resident",
+      "name": "駅長さん",
+      "description": "ちいさな終着駅を守る駅長さん。列車の時間はぜんぶ覚えている。",
+      "unlock": {
+        "kind": "start"
+      },
+      "art": "person",
+      "colors": {
+        "hat": "#1F4D5E",
+        "clothes": "#1F4D5E"
+      }
+    },
+    {
+      "id": "resident_shopkeeper",
+      "type": "resident",
+      "name": "商店のおばあさん",
+      "description": "町のことならなんでも知っている。あめ玉をくれる。",
+      "unlock": {
+        "kind": "placed",
+        "item": "shop"
+      },
+      "art": "person",
+      "colors": {
+        "hat": "#C8C8C8",
+        "clothes": "#B05B7C"
+      }
+    },
+    {
+      "id": "resident_barista",
+      "type": "resident",
+      "name": "カフェの店主",
+      "description": "コーヒーを入れるのが得意。旅の話を聞くのが好き。",
+      "unlock": {
+        "kind": "placed",
+        "item": "cafe"
+      },
+      "art": "person",
+      "colors": {
+        "hat": "#3A2A20",
+        "clothes": "#6B4B33"
+      }
+    },
+    {
+      "id": "resident_baker",
+      "type": "resident",
+      "name": "パン屋さん",
+      "description": "毎朝4時に起きてパンを焼く。おすすめはメロンパン。",
+      "unlock": {
+        "kind": "placed",
+        "item": "bakery"
+      },
+      "art": "person",
+      "colors": {
+        "hat": "#FFFFFF",
+        "clothes": "#F2B134"
+      }
+    },
+    {
+      "id": "resident_gardener",
+      "type": "resident",
+      "name": "庭師さん",
+      "description": "花壇の手入れをしている。季節の花にくわしい。",
+      "unlock": {
+        "kind": "placed",
+        "item": "flowerbed"
+      },
+      "art": "person",
+      "colors": {
+        "hat": "#E8C873",
+        "clothes": "#3F8A52"
+      }
+    },
+    {
+      "id": "resident_cat",
+      "type": "resident",
+      "name": "ねこ",
+      "description": "いつのまにかベンチに住みついた。名前はまだない。",
+      "unlock": {
+        "kind": "placed",
+        "item": "bench"
+      },
+      "art": "cat",
+      "colors": {
+        "hat": "#E8A04A",
+        "clothes": "#E8A04A"
+      }
+    },
+    {
+      "id": "resident_kid",
+      "type": "resident",
+      "name": "子ども",
+      "description": "噴水のまわりで遊ぶのが好き。将来の夢は運転士。",
+      "unlock": {
+        "kind": "placed",
+        "item": "fountain"
+      },
+      "art": "person",
+      "colors": {
+        "hat": "#D9473B",
+        "clothes": "#6FB6D9"
+      }
+    },
+    {
+      "id": "resident_clockkeeper",
+      "type": "resident",
+      "name": "時計守り",
+      "description": "時計台のねじを毎日まく。時間には少しうるさい。",
+      "unlock": {
+        "kind": "placed",
+        "item": "clocktower"
+      },
+      "art": "person",
+      "colors": {
+        "hat": "#2E3438",
+        "clothes": "#7B63B0"
+      }
+    }
+  ],
+  "slots": [
+    {
+      "id": "lot1",
+      "size": "large",
+      "x": 70,
+      "y": 250
+    },
+    {
+      "id": "lot2",
+      "size": "large",
+      "x": 290,
+      "y": 250
+    },
+    {
+      "id": "lot3",
+      "size": "large",
+      "x": 70,
+      "y": 330
+    },
+    {
+      "id": "lot4",
+      "size": "large",
+      "x": 290,
+      "y": 330
+    },
+    {
+      "id": "lot5",
+      "size": "large",
+      "x": 70,
+      "y": 410
+    },
+    {
+      "id": "lot6",
+      "size": "large",
+      "x": 290,
+      "y": 410
+    },
+    {
+      "id": "spot1",
+      "size": "small",
+      "x": 30,
+      "y": 165
+    },
+    {
+      "id": "spot2",
+      "size": "small",
+      "x": 330,
+      "y": 165
+    },
+    {
+      "id": "spot3",
+      "size": "small",
+      "x": 115,
+      "y": 195
+    },
+    {
+      "id": "spot4",
+      "size": "small",
+      "x": 245,
+      "y": 195
+    },
+    {
+      "id": "spot5",
+      "size": "small",
+      "x": 140,
+      "y": 280
+    },
+    {
+      "id": "spot6",
+      "size": "small",
+      "x": 220,
+      "y": 280
+    },
+    {
+      "id": "spot7",
+      "size": "small",
+      "x": 140,
+      "y": 360
+    },
+    {
+      "id": "spot8",
+      "size": "small",
+      "x": 220,
+      "y": 360
+    }
+  ]
+}

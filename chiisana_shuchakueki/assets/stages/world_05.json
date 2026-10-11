@@ -1,0 +1,326 @@
+{
+  "world": 5,
+  "name": "終着駅の町",
+  "stages": [
+    {
+      "id": "5-1",
+      "world": 5,
+      "number": 1,
+      "name": "大きな町",
+      "difficulty": 9,
+      "size": {
+        "width": 7,
+        "height": 7
+      },
+      "grid": [
+        "..  ^   ..  I1  L3  ..  L0",
+        "..  ..  ~   G1  I1  I1  L2",
+        "..  ..  ^   L1  L1  I0  L2",
+        "^   ..  #   ~   I1  S2  I1",
+        "..  ..  ~   ..  I1  L0  L2",
+        "..  ..  ..  I1  L2  I0  L1",
+        "..  ..  ..  #   L2  L0  .."
+      ],
+      "stars": {
+        "three": 9,
+        "two": 14
+      },
+      "reward": {
+        "coins": 55,
+        "firstClearBonus": 110
+      },
+      "unlock": {
+        "afterStage": null,
+        "minTotalStars": 75
+      }
+    },
+    {
+      "id": "5-2",
+      "world": 5,
+      "number": 2,
+      "name": "線路の迷路",
+      "difficulty": 9,
+      "size": {
+        "width": 7,
+        "height": 7
+      },
+      "grid": [
+        "L1  ..  ..  ..  ..  L0  ..",
+        "G2  I0  ..  #   ..  ..  ..",
+        "I0  L0  L3  ..  ..  I0  ..",
+        "L0  I1! L2  I1  ..  ..  ^",
+        "L3  I0  L1  L3  ..  ~   I0",
+        "I0  L2  L2  I1  L3  ^   ..",
+        "L3  L3  L0  I0  S3  L1  .."
+      ],
+      "stars": {
+        "three": 10,
+        "two": 15
+      },
+      "reward": {
+        "coins": 55,
+        "firstClearBonus": 110
+      },
+      "unlock": {
+        "afterStage": "5-1",
+        "minTotalStars": 0
+      }
+    },
+    {
+      "id": "5-3",
+      "world": 5,
+      "number": 3,
+      "name": "雪の朝",
+      "difficulty": 9,
+      "size": {
+        "width": 7,
+        "height": 7
+      },
+      "grid": [
+        "L1  I0  I0  L2  I1  ..  ..",
+        "L0  I1  I0  X0  L3  L1  ..",
+        "I1  L3  L3  I0  I1  L0  ~",
+        "L1  L1  L1  L2  L1  G3  I0",
+        "S0  L2  I0  L3  L3  L3  ..",
+        "~   ..  ..  ..  ..  ~   ..",
+        "..  ^   ..  ..  ..  ^   .."
+      ],
+      "stars": {
+        "three": 11,
+        "two": 17
+      },
+      "reward": {
+        "coins": 55,
+        "firstClearBonus": 110
+      },
+      "unlock": {
+        "afterStage": "5-2",
+        "minTotalStars": 0
+      }
+    },
+    {
+      "id": "5-4",
+      "world": 5,
+      "number": 4,
+      "name": "森の向こう",
+      "difficulty": 10,
+      "size": {
+        "width": 7,
+        "height": 7
+      },
+      "grid": [
+        "L0  L1  L0  L1  I0  L0  I1",
+        "I0  L2  I1  L3  I1  L3  S3",
+        "T2  L3  T1  G3  I1  L1  L2",
+        "L3  I1  L3  T2  ^   ^   ..",
+        "..  I1  L0  ..  ..  ..  ..",
+        "..  ..  ~   ..  ..  ^   ..",
+        "..  ~   ..  ..  ..  ..  .."
+      ],
+      "stars": {
+        "three": 9,
+        "two": 14
+      },
+      "reward": {
+        "coins": 60,
+        "firstClearBonus": 120
+      },
+      "unlock": {
+        "afterStage": "5-3",
+        "minTotalStars": 0
+      }
+    },
+    {
+      "id": "5-5",
+      "world": 5,
+      "number": 5,
+      "name": "湖のほとり",
+      "difficulty": 10,
+      "size": {
+        "width": 7,
+        "height": 7
+      },
+      "grid": [
+        "..  ~   ..  ..  ^   L0  ..",
+        "#   ..  ..  L2  L3  G3  ^",
+        "..  ..  ..  I0  I0  ..  #",
+        "..  ..  L3  L0  I1  L1  L2",
+        "..  L3  L0  L3  L0  L1  I0!",
+        "I1  S1  X0  L0  I0  T0! L1",
+        "#   L3  L1  I0  I0  L2  L2"
+      ],
+      "stars": {
+        "three": 11,
+        "two": 17
+      },
+      "reward": {
+        "coins": 60,
+        "firstClearBonus": 120
+      },
+      "unlock": {
+        "afterStage": "5-4",
+        "minTotalStars": 0
+      }
+    },
+    {
+      "id": "5-6",
+      "world": 5,
+      "number": 6,
+      "name": "鉄橋",
+      "difficulty": 10,
+      "size": {
+        "width": 7,
+        "height": 7
+      },
+      "grid": [
+        "L2  L3  L3  I0  L1  L3  ..",
+        "I1  L3  L2  L2  X0  L3  I1",
+        "L3  L3  L0  X0  L3  I0  I1",
+        "I0  S0  L0  L0  L1  G0  I1",
+        "~   I1  I0  L3  ..  L3  ..",
+        "..  ..  ..  #   ..  #   ..",
+        "..  ..  ^   ..  ..  ..  .."
+      ],
+      "stars": {
+        "three": 13,
+        "two": 20
+      },
+      "reward": {
+        "coins": 60,
+        "firstClearBonus": 120
+      },
+      "unlock": {
+        "afterStage": "5-5",
+        "minTotalStars": 0
+      }
+    },
+    {
+      "id": "5-7",
+      "world": 5,
+      "number": 7,
+      "name": "夜行列車",
+      "difficulty": 10,
+      "size": {
+        "width": 7,
+        "height": 7
+      },
+      "grid": [
+        "..  ..  I1  I0  ..  T0  ..",
+        "T2  L3  L3  L2! L3  L3  ..",
+        "L0  I0  L0  L2  X0  L2  T0",
+        "I0! I1  ^   G1  L1  L0  ..",
+        "L3  I1  L2  I0  L1  ..  #",
+        "L0  T3  L2  L2  ..  ..  ..",
+        "T2  S3  I0  ^   ..  ..  .."
+      ],
+      "stars": {
+        "three": 11,
+        "two": 17
+      },
+      "reward": {
+        "coins": 60,
+        "firstClearBonus": 120
+      },
+      "unlock": {
+        "afterStage": "5-6",
+        "minTotalStars": 0
+      }
+    },
+    {
+      "id": "5-8",
+      "world": 5,
+      "number": 8,
+      "name": "ふたたびの春",
+      "difficulty": 11,
+      "size": {
+        "width": 7,
+        "height": 7
+      },
+      "grid": [
+        "^   ..  ..  L2  I1  ..  ..",
+        "~   ^   L1  S1  I0  L3  ^",
+        "..  ..  L2  L3  L1  L3  L2",
+        "L1  ..  L1  L3  L2  L3  L1",
+        "L1  L2  L0  X0  G3  I1  L2",
+        "L0  X0  T2  L1  L2  L0  L3",
+        "..  L0  I1  I1  L1  ..  .."
+      ],
+      "stars": {
+        "three": 11,
+        "two": 17
+      },
+      "reward": {
+        "coins": 65,
+        "firstClearBonus": 130
+      },
+      "unlock": {
+        "afterStage": "5-7",
+        "minTotalStars": 0
+      }
+    },
+    {
+      "id": "5-9",
+      "world": 5,
+      "number": 9,
+      "name": "最後の分岐",
+      "difficulty": 11,
+      "size": {
+        "width": 7,
+        "height": 7
+      },
+      "grid": [
+        "T1  I0  ..  ..  ..  L1  ..",
+        "L1  L0  L1  ..  #   #   ..",
+        "G0  I1  I1  I1  I1  ..  ..",
+        "L0  I0  L1  L0  T3  ..  T2",
+        "I1  T2  I1  L0  L0  L3  ..",
+        "L1  I1  L3  T0  S0  L2  ..",
+        "I0  L3  I0  T2  L2  ..  .."
+      ],
+      "stars": {
+        "three": 11,
+        "two": 17
+      },
+      "reward": {
+        "coins": 65,
+        "firstClearBonus": 130
+      },
+      "unlock": {
+        "afterStage": "5-8",
+        "minTotalStars": 0
+      }
+    },
+    {
+      "id": "5-10",
+      "world": 5,
+      "number": 10,
+      "name": "ちいさな終着駅",
+      "difficulty": 11,
+      "size": {
+        "width": 7,
+        "height": 7
+      },
+      "grid": [
+        "L1  T0! I1! L2  T3  ..  ..",
+        "T3  L1  L2  I1  L0  ..  ..",
+        "G2  L0  X0  L2  L0  ~   ..",
+        "L2  L3  L1  L2  I1  ..  ..",
+        "T2  L3  L1  X0  L3  L1  ..",
+        "..  S2  L1  L2  T2  T2  ..",
+        "L0  L3  I1! I0  L0  I1  ^"
+      ],
+      "stars": {
+        "three": 16,
+        "two": 24
+      },
+      "reward": {
+        "coins": 65,
+        "firstClearBonus": 130
+      },
+      "unlock": {
+        "afterStage": "5-9",
+        "minTotalStars": 0
+      }
+    }
+  ]
+}

@@ -1,14 +1,15 @@
 import 'package:chiisana_shuchakueki/app.dart';
 import 'package:chiisana_shuchakueki/game/game_controller.dart';
-import 'package:chiisana_shuchakueki/game/stage_loader.dart';
+import 'package:chiisana_shuchakueki/game/progress_store.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// 本物のステージデータを読んでアプリを起動する。
-Future<GameController> startApp(WidgetTester tester) async {
-  final loaded = (await tester.runAsync(() => loadStages(rootBundle)))!;
-  expect(loaded.errors, isEmpty);
-  final game = GameController(loaded);
+/// 本物のステージデータとカタログを読んでアプリを起動する(保存はメモリ上)。
+Future<GameController> startApp(WidgetTester tester, {ProgressStore? store}) async {
+  final game = (await tester.runAsync(
+    () => GameController.load(bundle: rootBundle, store: store ?? MemoryProgressStore()),
+  ))!;
+  expect(game.loaded.errors, isEmpty);
   await tester.pumpWidget(ChiisanaApp(controller: game));
   await tester.pump();
   return game;

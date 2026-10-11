@@ -96,6 +96,9 @@ void main() {
       p.recordClear(stage('a'), 3);
       p.placedBuildings['slot1'] = 'house_small';
       p.settings = p.settings.copyWith(vibration: false);
+      p.selectedTrain = 'train_sakura';
+      p.seenItems.add('tree');
+      p.tutorialsSeen.add('rotate');
       final back = PlayerProgress.fromJson(jsonDecode(jsonEncode(p.toJson())));
       expect(back.coins, p.coins);
       expect(back.recordOf('a').bestStars, 2);
@@ -104,6 +107,9 @@ void main() {
       expect(back.unlockedItems, {'house_small'});
       expect(back.placedBuildings, {'slot1': 'house_small'});
       expect(back.settings.vibration, isFalse);
+      expect(back.selectedTrain, 'train_sakura');
+      expect(back.seenItems, {'tree'});
+      expect(back.tutorialsSeen, {'rotate'});
       expect(p.toJson()['version'], PlayerProgress.saveVersion);
     });
 

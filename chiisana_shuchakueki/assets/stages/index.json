@@ -1,5 +1,9 @@
 {
   "packs": [
-    "world_01.json"
+    "world_01.json",
+    "world_02.json",
+    "world_03.json",
+    "world_04.json",
+    "world_05.json"
   ]
 }

@@ -14,28 +14,44 @@ Future<void> openStage(WidgetTester tester, String id) async {
 }
 
 void main() {
-  testWidgets('タイトル:ボタンがそろい、準備中の機能は案内が出る', (tester) async {
+  testWidgets('タイトル:ボタンがそろい、それぞれの画面が開く', (tester) async {
     setScreen(tester, 390, 844);
     await startApp(tester);
     expect(find.text('つづきから'), findsOneWidget);
     expect(find.text('ステージ選択'), findsOneWidget);
-    expect(find.text('町を見る'), findsOneWidget);
-    expect(find.text('コレクション'), findsOneWidget);
-    await tester.tap(find.text('町を見る'));
-    await tester.pump(const Duration(milliseconds: 300));
-    expect(find.textContaining('準備中です'), findsOneWidget);
+    for (final (key, title) in const [
+      ('town', 'わたしの終着駅'),
+      ('collection', 'コレクション'),
+      ('settings', '設定'),
+    ]) {
+      await tester.tap(find.byKey(ValueKey(key)));
+      await settle(tester);
+      expect(find.text(title), findsWidgets, reason: key);
+      await tester.tap(find.byType(RoundBackButton).first);
+      await settle(tester);
+      expect(find.text('つづきから'), findsOneWidget);
+    }
   });
 
   testWidgets('ステージ選択:最初だけ遊べて、ほかは鍵がかかっている', (tester) async {
     setScreen(tester, 390, 844);
-    final game = await startApp(tester);
+    await startApp(tester);
     await tester.tap(find.byKey(const ValueKey('stage-select')));
     await settle(tester);
     expect(find.text('はじまりの町'), findsOneWidget);
-    expect(find.byIcon(Icons.lock_rounded), findsNWidgets(game.stages.length - 1));
+    Finder lockIn(String id) => find.descendant(
+      of: find.byKey(ValueKey('stage-$id')),
+      matching: find.byIcon(Icons.lock_rounded),
+    );
+    expect(lockIn('1-1'), findsNothing);
+    expect(lockIn('1-2'), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('stage-1-2')));
     await tester.pump(const Duration(milliseconds: 300));
-    expect(find.text('前のステージをクリアすると遊べます'), findsOneWidget);
+    expect(find.text('ステージ 1-1 をクリアすると遊べます'), findsOneWidget);
+    // ワールド 2 は星が必要
+    await tester.scrollUntilVisible(find.text('海辺の通り'), 200);
+    expect(find.textContaining('星を 15 個集めると開きます'), findsOneWidget);
+    await tester.scrollUntilVisible(find.text('はじまりの町'), -200);
     await tester.tap(find.byKey(const ValueKey('stage-1-1')));
     await settle(tester);
     expect(find.text('はじめての線路'), findsOneWidget);
@@ -153,7 +169,13 @@ void main() {
     await settle(tester);
     expect(find.text('はじまりの町'), findsOneWidget);
     // ステージ 2 が開いている
-    expect(find.byIcon(Icons.lock_rounded), findsNWidgets(8));
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('stage-1-2')),
+        matching: find.byIcon(Icons.lock_rounded),
+      ),
+      findsNothing,
+    );
     // 戻るとタイトル
     await tester.tap(find.byType(RoundBackButton));
     await settle(tester);

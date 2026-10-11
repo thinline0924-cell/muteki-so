@@ -91,7 +91,7 @@ class GameSettings {
 /// プレイヤーの進行状況。セーブデータの中身そのもの。
 ///
 /// 画面とは無関係な Dart のクラスなので、テストで直接使える。
-/// 端末への保存(SharedPreferences)は Phase 2 で追加する。
+/// 端末への保存は ProgressStore(progress_store.dart)が行う。
 class PlayerProgress {
   PlayerProgress({
     this.lastPlayedStage,
@@ -100,9 +100,15 @@ class PlayerProgress {
     Set<String>? unlockedItems,
     Map<String, String>? placedBuildings,
     this.settings = const GameSettings(),
+    this.selectedTrain,
+    this.selectedStation,
+    Set<String>? seenItems,
+    Set<String>? tutorialsSeen,
   }) : records = records ?? {},
        unlockedItems = unlockedItems ?? {},
        placedBuildings = placedBuildings ?? {},
+       seenItems = seenItems ?? {},
+       tutorialsSeen = tutorialsSeen ?? {},
        _coins = _clampCoins(coins);
 
   /// セーブデータの形式の版。形を変えたら上げて、fromJson で古い形を読み替える。
@@ -119,6 +125,16 @@ class PlayerProgress {
   /// 町の配置場所 ID → 置いた建物の ID
   final Map<String, String> placedBuildings;
   GameSettings settings;
+
+  /// 走らせる列車・町の駅舎(アイテム ID。null なら最初のもの)
+  String? selectedTrain;
+  String? selectedStation;
+
+  /// 図鑑で見たアイテム(見ていないものに「NEW」を付ける)
+  final Set<String> seenItems;
+
+  /// もう見たチュートリアル
+  final Set<String> tutorialsSeen;
 
   int get coins => _coins;
 
@@ -174,6 +190,10 @@ class PlayerProgress {
     'unlockedItems': unlockedItems.toList()..sort(),
     'placedBuildings': placedBuildings,
     'settings': settings.toJson(),
+    if (selectedTrain != null) 'selectedTrain': selectedTrain,
+    if (selectedStation != null) 'selectedStation': selectedStation,
+    'seenItems': seenItems.toList()..sort(),
+    'tutorialsSeen': tutorialsSeen.toList()..sort(),
   };
 
   /// セーブデータを読む。欠けた値・おかしな値は安全な初期値にする。
@@ -190,11 +210,13 @@ class PlayerProgress {
     final items = json['unlockedItems'];
     final placed = json['placedBuildings'];
     final last = json['lastPlayedStage'];
+    Set<String>? strings(Object? v) => v is List ? v.whereType<String>().toSet() : null;
+    String? str(Object? v) => v is String && v.isNotEmpty ? v : null;
     return PlayerProgress(
       lastPlayedStage: last is String ? last : null,
       records: records,
       coins: coins is int ? coins : 0,
-      unlockedItems: items is List ? items.whereType<String>().toSet() : null,
+      unlockedItems: strings(items),
       placedBuildings: placed is Map
           ? {
               for (final e in placed.entries)
@@ -202,6 +224,10 @@ class PlayerProgress {
             }
           : null,
       settings: GameSettings.fromJson(json['settings']),
+      selectedTrain: str(json['selectedTrain']),
+      selectedStation: str(json['selectedStation']),
+      seenItems: strings(json['seenItems']),
+      tutorialsSeen: strings(json['tutorialsSeen']),
     );
   }
 }

@@ -1,0 +1,313 @@
+{
+  "world": 2,
+  "name": "海辺の通り",
+  "stages": [
+    {
+      "id": "2-1",
+      "world": 2,
+      "number": 1,
+      "name": "しおかぜ",
+      "difficulty": 3,
+      "size": {
+        "width": 5,
+        "height": 5
+      },
+      "grid": [
+        "..  ..  ..  ..  ^",
+        "L1  L2  ..  I0  ..",
+        "L3  I0  I1  L1  ..",
+        "I0  ^   ^   S0  I1",
+        "L0  I0  G3  L0  .."
+      ],
+      "stars": {
+        "three": 5,
+        "two": 8
+      },
+      "reward": {
+        "coins": 25,
+        "firstClearBonus": 50
+      },
+      "unlock": {
+        "afterStage": null,
+        "minTotalStars": 15
+      }
+    },
+    {
+      "id": "2-2",
+      "world": 2,
+      "number": 2,
+      "name": "灯台の見える道",
+      "difficulty": 3,
+      "size": {
+        "width": 5,
+        "height": 5
+      },
+      "grid": [
+        "..  ..  ^   ^   ..",
+        "..  ..  L2  L2  ..",
+        "^   L0  L1! I0  L1",
+        "..  L1  I0  S2  I1",
+        "I1  G1  L2  L1  L3"
+      ],
+      "stars": {
+        "three": 7,
+        "two": 11
+      },
+      "reward": {
+        "coins": 25,
+        "firstClearBonus": 50
+      },
+      "unlock": {
+        "afterStage": "2-1",
+        "minTotalStars": 0
+      }
+    },
+    {
+      "id": "2-3",
+      "world": 2,
+      "number": 3,
+      "name": "貝がらの浜",
+      "difficulty": 3,
+      "size": {
+        "width": 5,
+        "height": 5
+      },
+      "grid": [
+        "..  L2  I0  G3  ..",
+        "L3  I0  L3  ..  ^",
+        "L1  I0  L3  L2  ..",
+        "..  I0  ..  L1  S3",
+        "L2  L2  I1  L3  ~"
+      ],
+      "stars": {
+        "three": 6,
+        "two": 9
+      },
+      "reward": {
+        "coins": 25,
+        "firstClearBonus": 50
+      },
+      "unlock": {
+        "afterStage": "2-2",
+        "minTotalStars": 0
+      }
+    },
+    {
+      "id": "2-4",
+      "world": 2,
+      "number": 4,
+      "name": "港の倉庫",
+      "difficulty": 4,
+      "size": {
+        "width": 6,
+        "height": 6
+      },
+      "grid": [
+        "..  ..  ..  ^   ..  ..",
+        "..  ..  L2  I0  #   ..",
+        "~   I0  L3  S3  ~   G2",
+        "..  ..  I1  ..  ..  I0",
+        "^   L3  L3  I1  L0  I1",
+        "#   ..  L3  L3  L0  L3"
+      ],
+      "stars": {
+        "three": 7,
+        "two": 11
+      },
+      "reward": {
+        "coins": 30,
+        "firstClearBonus": 60
+      },
+      "unlock": {
+        "afterStage": "2-3",
+        "minTotalStars": 0
+      }
+    },
+    {
+      "id": "2-5",
+      "world": 2,
+      "number": 5,
+      "name": "かもめ通り",
+      "difficulty": 4,
+      "size": {
+        "width": 6,
+        "height": 6
+      },
+      "grid": [
+        "L1  I0  L2! L0  L0  L1",
+        "I1  ^   L3  I1  I0  G3",
+        "L0  I0  L2  L2  ..  ^",
+        "..  L3  I0  I0  ..  #",
+        "..  ..  I0  ..  ..  ^",
+        "#   L3  L3  S3  ..  .."
+      ],
+      "stars": {
+        "three": 6,
+        "two": 9
+      },
+      "reward": {
+        "coins": 30,
+        "firstClearBonus": 60
+      },
+      "unlock": {
+        "afterStage": "2-4",
+        "minTotalStars": 0
+      }
+    },
+    {
+      "id": "2-6",
+      "world": 2,
+      "number": 6,
+      "name": "防波堤",
+      "difficulty": 4,
+      "size": {
+        "width": 6,
+        "height": 6
+      },
+      "grid": [
+        "^   ~   ..  L0  L3  L1",
+        "..  L3  L0  I1  L2  G0",
+        "~   L0  L0  I1  I1  L1",
+        "..  #   I1  S1  I0  L3",
+        "..  ~   ..  I0  L2  ^",
+        "..  ^   ..  ..  ..  .."
+      ],
+      "stars": {
+        "three": 7,
+        "two": 11
+      },
+      "reward": {
+        "coins": 30,
+        "firstClearBonus": 60
+      },
+      "unlock": {
+        "afterStage": "2-5",
+        "minTotalStars": 0
+      }
+    },
+    {
+      "id": "2-7",
+      "world": 2,
+      "number": 7,
+      "name": "夕なぎ",
+      "difficulty": 4,
+      "size": {
+        "width": 6,
+        "height": 6
+      },
+      "grid": [
+        "I1  ~   #   ..  L0  G2",
+        "L1! S3  L1  ..  #   I1",
+        "L0! L1  L0  ..  ..  I0",
+        "L2  L0  L0  L1  L3  I0",
+        "..  ..  I1  I0  L1  I0",
+        "..  ^   L3  I0  I0  L3"
+      ],
+      "stars": {
+        "three": 8,
+        "two": 12
+      },
+      "reward": {
+        "coins": 30,
+        "firstClearBonus": 60
+      },
+      "unlock": {
+        "afterStage": "2-6",
+        "minTotalStars": 0
+      }
+    },
+    {
+      "id": "2-8",
+      "world": 2,
+      "number": 8,
+      "name": "漁師町",
+      "difficulty": 5,
+      "size": {
+        "width": 6,
+        "height": 6
+      },
+      "grid": [
+        "^   ..  ..  ..  L0  S2",
+        "^   ..  I1  ^   L0  I0",
+        "^   I0  G2  I1  I1  I1",
+        "..  I0  L3  L0  L0  L0",
+        "^   L1  L2  L3  L3  L0",
+        "..  ..  L2  I1  I0  L2"
+      ],
+      "stars": {
+        "three": 9,
+        "two": 14
+      },
+      "reward": {
+        "coins": 35,
+        "firstClearBonus": 70
+      },
+      "unlock": {
+        "afterStage": "2-7",
+        "minTotalStars": 0
+      }
+    },
+    {
+      "id": "2-9",
+      "world": 2,
+      "number": 9,
+      "name": "波のリズム",
+      "difficulty": 5,
+      "size": {
+        "width": 6,
+        "height": 6
+      },
+      "grid": [
+        "I0  ..  ..  L0  L1  L2",
+        "..  ..  ..  L0  S0  I1",
+        "..  ..  ~   I1  L2  L3",
+        "..  ..  I0  L3  I1  L2",
+        "..  L0  G2  L1  I0  L1",
+        "^   L2  L0  I1  L0  L3"
+      ],
+      "stars": {
+        "three": 8,
+        "two": 12
+      },
+      "reward": {
+        "coins": 35,
+        "firstClearBonus": 70
+      },
+      "unlock": {
+        "afterStage": "2-8",
+        "minTotalStars": 0
+      }
+    },
+    {
+      "id": "2-10",
+      "world": 2,
+      "number": 10,
+      "name": "岬の駅",
+      "difficulty": 5,
+      "size": {
+        "width": 6,
+        "height": 6
+      },
+      "grid": [
+        "..  ..  ..  ..  ..  L2",
+        "#   ..  L3  L0  I0  G2",
+        "^   L3  S1  I0  L2  I0",
+        "^   ^   L1  L3  L2  I1",
+        "..  L1  L0  L3! L1  L3",
+        "..  L2  L2  I1! L3  .."
+      ],
+      "stars": {
+        "three": 8,
+        "two": 12
+      },
+      "reward": {
+        "coins": 35,
+        "firstClearBonus": 70
+      },
+      "unlock": {
+        "afterStage": "2-9",
+        "minTotalStars": 0
+      }
+    }
+  ]
+}

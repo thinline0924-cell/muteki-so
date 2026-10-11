@@ -16,12 +16,18 @@ class TrainView {
     required this.front,
     this.crashed = false,
     this.smokePhase = 0,
+    this.body = Palette.train,
+    this.accent = Palette.trainAccent,
   });
 
   final TrackGeometry geometry;
   final double front;
   final bool crashed;
   final double smokePhase;
+
+  /// 車体と帯の色(コレクションで選んだ列車)
+  final Color body;
+  final Color accent;
 }
 
 /// 盤面。タイルをタップすると [onTapTile] が呼ばれる。
@@ -35,6 +41,7 @@ class BoardView extends StatefulWidget {
     this.enabled = true,
     this.hint,
     this.hintTaps = 0,
+    this.pointer = false,
     this.train,
     this.crashAt,
   });
@@ -44,6 +51,9 @@ class BoardView extends StatefulWidget {
   final bool enabled;
   final Pos? hint;
   final int hintTaps;
+
+  /// ヒントのマスに「指」を出して、タップをうながす(チュートリアル用)
+  final bool pointer;
   final TrainView? train;
 
   /// 失敗したときに × を出す位置(マス単位の座標)
@@ -103,7 +113,8 @@ class _BoardViewState extends State<BoardView> with SingleTickerProviderStateMix
     final b = widget.board;
     return LayoutBuilder(
       builder: (context, c) {
-        const frame = 10.0;
+        // 狭い画面では枠を細くして、マスを大きく保つ
+        final frame = c.maxWidth < 320 ? 5.0 : 10.0;
         final cell = math
             .min((c.maxWidth - frame * 2) / b.width, (c.maxHeight - frame * 2) / b.height)
             .floorToDouble();
@@ -113,7 +124,7 @@ class _BoardViewState extends State<BoardView> with SingleTickerProviderStateMix
           child: Container(
             width: w + frame * 2,
             height: h + frame * 2,
-            padding: const EdgeInsets.all(frame),
+            padding: EdgeInsets.all(frame),
             decoration: BoxDecoration(
               color: Palette.boardFrame,
               borderRadius: BorderRadius.circular(16),
@@ -144,11 +155,14 @@ class _BoardViewState extends State<BoardView> with SingleTickerProviderStateMix
                               cellSize: cell,
                               crashed: widget.train!.crashed,
                               smokePhase: widget.train!.smokePhase,
+                              body: widget.train!.body,
+                              accent: widget.train!.accent,
                             ),
                           ),
                         ),
                       ),
                     if (widget.crashAt != null) _crashMark(widget.crashAt!, cell, b),
+                    if (widget.pointer && widget.hint != null) _pointerMark(widget.hint!, cell),
                   ],
                 ),
               ),
@@ -246,6 +260,29 @@ class _BoardViewState extends State<BoardView> with SingleTickerProviderStateMix
               ],
             );
           },
+        ),
+      ),
+    );
+  }
+
+  Widget _pointerMark(Pos p, double cell) {
+    final size = math.max(32.0, cell * 0.55);
+    return AnimatedBuilder(
+      animation: _pulse,
+      builder: (context, child) => Positioned(
+        left: (p.x + 0.55) * cell - size * 0.2,
+        top: (p.y + 0.55) * cell + _pulse.value * cell * 0.12,
+        width: size,
+        height: size,
+        child: child!,
+      ),
+      child: IgnorePointer(
+        child: Icon(
+          Icons.touch_app_rounded,
+          key: const ValueKey('pointer'),
+          size: size,
+          color: Colors.white,
+          shadows: const [Shadow(color: Color(0xAA000000), blurRadius: 6)],
         ),
       ),
     );

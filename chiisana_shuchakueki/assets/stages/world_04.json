@@ -1,0 +1,317 @@
+{
+  "world": 4,
+  "name": "にぎやかな駅前",
+  "stages": [
+    {
+      "id": "4-1",
+      "world": 4,
+      "number": 1,
+      "name": "T字の分かれ道",
+      "difficulty": 7,
+      "size": {
+        "width": 6,
+        "height": 6
+      },
+      "grid": [
+        "..  ..  ..  ..  ..  ~",
+        "..  ..  ..  ..  ..  ..",
+        "#   L3  L0  ..  ..  ..",
+        "L1  I0  G3  #   ..  ..",
+        "L1  I1  L0  L0  ..  ..",
+        "..  ~   T3  I1  S3  ^"
+      ],
+      "stars": {
+        "three": 6,
+        "two": 9
+      },
+      "reward": {
+        "coins": 45,
+        "firstClearBonus": 90
+      },
+      "tutorial": "tee",
+      "unlock": {
+        "afterStage": null,
+        "minTotalStars": 55
+      }
+    },
+    {
+      "id": "4-2",
+      "world": 4,
+      "number": 2,
+      "name": "商店街",
+      "difficulty": 7,
+      "size": {
+        "width": 6,
+        "height": 6
+      },
+      "grid": [
+        "#   ..  L0  T1  I1  #",
+        "..  ..  I1  L1  L2  I1",
+        "..  ..  I0  ..  G0  ..",
+        "L0  L3  L3  ..  ..  ..",
+        "S1  L3  L1  ..  ..  #",
+        "#   L3  ..  ..  ..  .."
+      ],
+      "stars": {
+        "three": 7,
+        "two": 11
+      },
+      "reward": {
+        "coins": 45,
+        "firstClearBonus": 90
+      },
+      "unlock": {
+        "afterStage": "4-1",
+        "minTotalStars": 0
+      }
+    },
+    {
+      "id": "4-3",
+      "world": 4,
+      "number": 3,
+      "name": "市場",
+      "difficulty": 7,
+      "size": {
+        "width": 6,
+        "height": 6
+      },
+      "grid": [
+        "..  ..  ..  ..  ..  ~",
+        "~   ..  ..  ..  ^   ..",
+        "L0  ..  ..  ..  ..  ..",
+        "T0  I1  L3  L0  ..  I1",
+        "I0  L3  I0  ^   T3  G2",
+        "T3  S3  L3  I1  I1  L1"
+      ],
+      "stars": {
+        "three": 6,
+        "two": 9
+      },
+      "reward": {
+        "coins": 45,
+        "firstClearBonus": 90
+      },
+      "unlock": {
+        "afterStage": "4-2",
+        "minTotalStars": 0
+      }
+    },
+    {
+      "id": "4-4",
+      "world": 4,
+      "number": 4,
+      "name": "ポイント切替",
+      "difficulty": 8,
+      "size": {
+        "width": 6,
+        "height": 6
+      },
+      "grid": [
+        "T1  L1  ..  ..  ..  ~",
+        "L0  I1  L1  L1  ..  ..",
+        "L3  S3  T3  L2  ~   ..",
+        "L0  ..  L2  I1  T2  ..",
+        "..  ..  ^   T0  L0! L2",
+        "..  ..  ..  G1  I1  L2"
+      ],
+      "stars": {
+        "three": 9,
+        "two": 14
+      },
+      "reward": {
+        "coins": 50,
+        "firstClearBonus": 100
+      },
+      "unlock": {
+        "afterStage": "4-3",
+        "minTotalStars": 0
+      }
+    },
+    {
+      "id": "4-5",
+      "world": 4,
+      "number": 5,
+      "name": "パン屋の角",
+      "difficulty": 8,
+      "size": {
+        "width": 6,
+        "height": 6
+      },
+      "grid": [
+        "L3  L2  L0  ..  ..  ..",
+        "L2  L3  T0  L3  ..  ..",
+        "G0  L3  X0  L0  I0  ..",
+        "L1  L1  L1  T3  ..  ..",
+        "~   L1  S1  L3  ..  ^",
+        "..  ..  ..  I1  ..  ^"
+      ],
+      "stars": {
+        "three": 9,
+        "two": 14
+      },
+      "reward": {
+        "coins": 50,
+        "firstClearBonus": 100
+      },
+      "unlock": {
+        "afterStage": "4-4",
+        "minTotalStars": 0
+      }
+    },
+    {
+      "id": "4-6",
+      "world": 4,
+      "number": 6,
+      "name": "噴水広場",
+      "difficulty": 8,
+      "size": {
+        "width": 6,
+        "height": 6
+      },
+      "grid": [
+        "..  ..  ..  ..  ..  ..",
+        "..  ..  ..  I1  I0  L2",
+        "..  ..  L1  T2  I1  G3",
+        "..  L0  I1  L0  L2  ^",
+        "S1  T2  I1  L0  L3  L1",
+        "^   L3  I1  L2  I0  L3"
+      ],
+      "stars": {
+        "three": 8,
+        "two": 12
+      },
+      "reward": {
+        "coins": 50,
+        "firstClearBonus": 100
+      },
+      "unlock": {
+        "afterStage": "4-5",
+        "minTotalStars": 0
+      }
+    },
+    {
+      "id": "4-7",
+      "world": 4,
+      "number": 7,
+      "name": "時計台",
+      "difficulty": 8,
+      "size": {
+        "width": 6,
+        "height": 6
+      },
+      "grid": [
+        "..  T2  ~   ..  ..  ..",
+        "L1  G2  ^   T3  ..  ..",
+        "..  L3  L1  L0  L2  L2",
+        "L1  L3  T3! L3  I0  I1",
+        "S0  L1  T2  T3  L3  ^",
+        "..  ..  L3  ..  I0  .."
+      ],
+      "stars": {
+        "three": 10,
+        "two": 15
+      },
+      "reward": {
+        "coins": 50,
+        "firstClearBonus": 100
+      },
+      "unlock": {
+        "afterStage": "4-6",
+        "minTotalStars": 0
+      }
+    },
+    {
+      "id": "4-8",
+      "world": 4,
+      "number": 8,
+      "name": "夜店",
+      "difficulty": 9,
+      "size": {
+        "width": 6,
+        "height": 6
+      },
+      "grid": [
+        "..  ^   L3  T0  L1  L0",
+        "..  ..  I1  L3  L0  I0",
+        "I0  L0  L0  I0  S2  L3",
+        "G1  X0  L0  L2  T1  L3",
+        "..  L2  L1  L1  I1  ..",
+        "..  I1  ..  ..  ..  ^"
+      ],
+      "stars": {
+        "three": 11,
+        "two": 17
+      },
+      "reward": {
+        "coins": 55,
+        "firstClearBonus": 110
+      },
+      "unlock": {
+        "afterStage": "4-7",
+        "minTotalStars": 0
+      }
+    },
+    {
+      "id": "4-9",
+      "world": 4,
+      "number": 9,
+      "name": "乗りかえ駅",
+      "difficulty": 9,
+      "size": {
+        "width": 6,
+        "height": 6
+      },
+      "grid": [
+        "L1  I0  I1  G3  ..  ..",
+        "L2  L0  I0  L1  ..  ..",
+        "I0  T0  I0  ^   ..  ..",
+        "L1  T3  L1  I0  ..  ..",
+        "I0  I1  L3  S2  ..  ..",
+        "L1  T2  I1  L1  L1  .."
+      ],
+      "stars": {
+        "three": 10,
+        "two": 15
+      },
+      "reward": {
+        "coins": 55,
+        "firstClearBonus": 110
+      },
+      "unlock": {
+        "afterStage": "4-8",
+        "minTotalStars": 0
+      }
+    },
+    {
+      "id": "4-10",
+      "world": 4,
+      "number": 10,
+      "name": "駅前大通り",
+      "difficulty": 9,
+      "size": {
+        "width": 6,
+        "height": 6
+      },
+      "grid": [
+        "L0  L1  T2  I0  L2  I1",
+        "G1  X0  L1  L2  L3  ..",
+        "I0  L3  L3  T1  I1  L2!",
+        "..  I0  T3  S2  L2  L3!",
+        "..  ..  L1  T2  I0  L3",
+        "^   ^   I1  L3  L2  .."
+      ],
+      "stars": {
+        "three": 9,
+        "two": 14
+      },
+      "reward": {
+        "coins": 55,
+        "firstClearBonus": 110
+      },
+      "unlock": {
+        "afterStage": "4-9",
+        "minTotalStars": 0
+      }
+    }
+  ]
+}

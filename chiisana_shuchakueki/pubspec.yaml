@@ -28,10 +28,12 @@ environment:
 # the latest version available on pub.dev. To see which dependencies have newer
 # versions available, run `flutter pub outdated`.
 dependencies:
+  audioplayers: ^6.8.1
   flutter:
     sdk: flutter
   flutter_localizations:
     sdk: flutter
+  shared_preferences: ^2.5.6
 
 dev_dependencies:
   flutter_test:
@@ -57,6 +59,8 @@ flutter:
 
   assets:
     - assets/stages/
+    - assets/data/
+    - assets/sounds/
 
   # To add assets to your application, add an assets section, like this:
   # assets:

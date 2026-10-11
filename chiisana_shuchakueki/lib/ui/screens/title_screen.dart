@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 
+import '../../game/sound.dart';
 import '../game_scope.dart';
 import '../painters/scenery_painter.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
+import 'collection_screen.dart';
 import 'puzzle_screen.dart';
+import 'settings_screen.dart';
 import 'stage_select_screen.dart';
+import 'town_screen.dart';
 
 /// タイトル画面。
 class TitleScreen extends StatefulWidget {
@@ -27,15 +31,15 @@ class _TitleScreenState extends State<TitleScreen> with SingleTickerProviderStat
     super.dispose();
   }
 
-  void _comingSoon(String what) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text('$whatは準備中です(次の段階で追加します)')));
+  void _open(Widget screen) {
+    GameScope.of(context).play(Sfx.button);
+    Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => screen));
   }
 
   void _continue() {
     final game = GameScope.of(context);
     final stage = game.continueStage;
+    game.play(Sfx.button);
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => stage != null ? PuzzleScreen(stage: stage) : const StageSelectScreen(),
@@ -43,9 +47,7 @@ class _TitleScreenState extends State<TitleScreen> with SingleTickerProviderStat
     );
   }
 
-  void _stageSelect() {
-    Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const StageSelectScreen()));
-  }
+  void _stageSelect() => _open(const StageSelectScreen());
 
   @override
   Widget build(BuildContext context) {
@@ -97,25 +99,25 @@ class _TitleScreenState extends State<TitleScreen> with SingleTickerProviderStat
                             ),
                             SizedBox(height: compact ? 8 : 14),
                             ChunkyButton(
+                              key: const ValueKey('town'),
                               label: '町を見る',
                               height: buttonHeight,
                               icon: Icons.home_rounded,
                               color: Palette.green,
                               shadow: Palette.greenDark,
-                              badge: '準備中',
-                              muted: true,
-                              onPressed: () => _comingSoon('町づくり'),
+                              onPressed: () => _open(const TownScreen()),
                             ),
                             SizedBox(height: compact ? 8 : 14),
                             ChunkyButton(
+                              key: const ValueKey('collection'),
                               label: 'コレクション',
                               height: buttonHeight,
                               icon: Icons.menu_book_rounded,
                               color: Palette.purple,
                               shadow: Palette.purpleDark,
-                              badge: '準備中',
-                              muted: true,
-                              onPressed: () => _comingSoon('コレクション'),
+                              badge: game.newItemCount > 0 ? 'NEW ${game.newItemCount}' : null,
+                              badgeColor: Palette.danger,
+                              onPressed: () => _open(const CollectionScreen()),
                             ),
                           ],
                         ),
@@ -123,9 +125,10 @@ class _TitleScreenState extends State<TitleScreen> with SingleTickerProviderStat
                     ),
                     SizedBox(height: compact ? 8 : 16),
                     IconButton.filled(
-                      tooltip: '設定(準備中)',
+                      key: const ValueKey('settings'),
+                      tooltip: '設定',
                       style: IconButton.styleFrom(backgroundColor: Palette.navyDark),
-                      onPressed: () => _comingSoon('設定'),
+                      onPressed: () => _open(const SettingsScreen()),
                       icon: const Icon(Icons.settings_rounded, color: Colors.white),
                     ),
                     SizedBox(height: compact ? 8 : 18),
