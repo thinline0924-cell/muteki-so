@@ -23,3 +23,7 @@
 | `js/game.js` | 進行(タイトル・事件の準備・文章・選択肢・時間・セーブ・推理・対決) |
 | `js/pixel.js` | ドット絵(320×180)。`Pixel.draw / portrait / hotspots / personSpots` |
 | `js/audio.js` | Web Audio で BGM・環境音・効果音を合成。`Sound.bgm / ambient / se` |
+
+## 別アプリ:`chiisana_shuchakueki/`
+線路パズル「ちいさな終着駅」(Flutter 製のスマホアプリ)。上の約束は「霧笛荘事件」用で、このフォルダには当てはまらない。
+ルールは `chiisana_shuchakueki/CLAUDE.md` を見る。

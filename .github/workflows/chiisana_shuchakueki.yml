@@ -1,0 +1,65 @@
+# ちいさな終着駅:push のたびにテストし、Android の APK を作る
+name: ちいさな終着駅
+
+on:
+  push:
+    paths:
+      - 'chiisana_shuchakueki/**'
+      - '.github/workflows/chiisana_shuchakueki.yml'
+  pull_request:
+    paths:
+      - 'chiisana_shuchakueki/**'
+      - '.github/workflows/chiisana_shuchakueki.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: chiisana-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: chiisana_shuchakueki
+
+jobs:
+  test:
+    name: 解析とテスト
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.7
+          cache: true
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test
+
+  android:
+    name: Android APK
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.7
+          cache: true
+      - run: flutter pub get
+      # 署名は開発用(debug)の鍵。動作確認用で、ストアには出せない
+      - run: flutter build apk --release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: chiisana-shuchakueki-apk
+          path: chiisana_shuchakueki/build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 14

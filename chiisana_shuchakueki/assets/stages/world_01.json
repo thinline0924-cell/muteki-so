@@ -1,0 +1,311 @@
+{
+  "world": 1,
+  "name": "はじまりの町",
+  "stages": [
+    {
+      "id": "1-1",
+      "world": 1,
+      "number": 1,
+      "name": "はじめての線路",
+      "difficulty": 1,
+      "size": {
+        "width": 5,
+        "height": 5
+      },
+      "grid": [
+        "^   ..  ..  ..  ^",
+        "..  ..  ..  ..  ..",
+        "S1  I1  I0  I1  G3",
+        "..  ..  ..  ..  ..",
+        "~   ..  ..  ^   .."
+      ],
+      "stars": {
+        "three": 1,
+        "two": 3
+      },
+      "reward": {
+        "coins": 15,
+        "firstClearBonus": 30
+      },
+      "tutorial": "rotate",
+      "unlock": {
+        "afterStage": null,
+        "minTotalStars": 0
+      }
+    },
+    {
+      "id": "1-2",
+      "world": 1,
+      "number": 2,
+      "name": "まがり角",
+      "difficulty": 1,
+      "size": {
+        "width": 5,
+        "height": 5
+      },
+      "grid": [
+        "^   ..  ..  ..  ^",
+        "..  S2  ..  ..  ..",
+        "..  L3  I1  L1  ..",
+        "..  ..  ..  I0  ..",
+        "~   ..  ..  G0  .."
+      ],
+      "stars": {
+        "three": 2,
+        "two": 4
+      },
+      "reward": {
+        "coins": 15,
+        "firstClearBonus": 30
+      },
+      "tutorial": "curve",
+      "unlock": {
+        "afterStage": "1-1",
+        "minTotalStars": 0
+      }
+    },
+    {
+      "id": "1-3",
+      "world": 1,
+      "number": 3,
+      "name": "くねくね道",
+      "difficulty": 1,
+      "size": {
+        "width": 5,
+        "height": 5
+      },
+      "grid": [
+        "^   ^   ..  ^   ..",
+        "S1  L1  ..  L0  G3",
+        "..  I0  ..  I0  ..",
+        "..  L3  I1  L3  ..",
+        "~   ~   ..  ..  ^"
+      ],
+      "stars": {
+        "three": 3,
+        "two": 5
+      },
+      "reward": {
+        "coins": 15,
+        "firstClearBonus": 30
+      },
+      "tutorial": "stars",
+      "unlock": {
+        "afterStage": "1-2",
+        "minTotalStars": 0
+      }
+    },
+    {
+      "id": "1-4",
+      "world": 1,
+      "number": 4,
+      "name": "えらべる道",
+      "difficulty": 2,
+      "size": {
+        "width": 5,
+        "height": 5
+      },
+      "grid": [
+        "..  #   ..  ..  ^",
+        "^   ..  L0  ..  ..",
+        "..  ..  G2  ..  ..",
+        "L0  S3  I1  L3  ..",
+        "L0  I1  L1  I1  ^"
+      ],
+      "stars": {
+        "three": 4,
+        "two": 6
+      },
+      "reward": {
+        "coins": 20,
+        "firstClearBonus": 40
+      },
+      "unlock": {
+        "afterStage": "1-3",
+        "minTotalStars": 0
+      }
+    },
+    {
+      "id": "1-5",
+      "world": 1,
+      "number": 5,
+      "name": "森のそば",
+      "difficulty": 2,
+      "size": {
+        "width": 5,
+        "height": 5
+      },
+      "grid": [
+        "L3  I1  I1  I0  L1",
+        "L3  S3  ..  I1  G0",
+        "L0  L0  ..  ..  ^",
+        "^   ..  #   ..  ^",
+        "..  ..  ..  ~   .."
+      ],
+      "stars": {
+        "three": 5,
+        "two": 8
+      },
+      "reward": {
+        "coins": 20,
+        "firstClearBonus": 40
+      },
+      "unlock": {
+        "afterStage": "1-4",
+        "minTotalStars": 0
+      }
+    },
+    {
+      "id": "1-6",
+      "world": 1,
+      "number": 6,
+      "name": "動かない線路",
+      "difficulty": 2,
+      "size": {
+        "width": 5,
+        "height": 5
+      },
+      "grid": [
+        "L2  S1  L2! ..  ..",
+        "L3  I1  L2  I0  #",
+        "I0  G2  L1  ..  ..",
+        "I0! I1  L2  ..  ~",
+        "L0  L2  ^   ..  .."
+      ],
+      "stars": {
+        "three": 5,
+        "two": 8
+      },
+      "reward": {
+        "coins": 20,
+        "firstClearBonus": 40
+      },
+      "tutorial": "fixed",
+      "unlock": {
+        "afterStage": "1-5",
+        "minTotalStars": 0
+      }
+    },
+    {
+      "id": "1-7",
+      "world": 1,
+      "number": 7,
+      "name": "岩をよけて",
+      "difficulty": 2,
+      "size": {
+        "width": 5,
+        "height": 5
+      },
+      "grid": [
+        "#   #   ^   ..  ^",
+        "#   ..  ..  I0  L2",
+        "..  ..  L3  I1  S3",
+        "L0  I1  L2  I1  ~",
+        "L2  I1  I1  G3  .."
+      ],
+      "stars": {
+        "three": 6,
+        "two": 9
+      },
+      "reward": {
+        "coins": 20,
+        "firstClearBonus": 40
+      },
+      "tutorial": "obstacle",
+      "unlock": {
+        "afterStage": "1-6",
+        "minTotalStars": 0
+      }
+    },
+    {
+      "id": "1-8",
+      "world": 1,
+      "number": 8,
+      "name": "とおまわり",
+      "difficulty": 3,
+      "size": {
+        "width": 5,
+        "height": 5
+      },
+      "grid": [
+        "L3  I0  L1  ^   ^",
+        "I1  ..  G0  #   ..",
+        "I0! ..  #   S2  ..",
+        "I0  L3  ^   I0  I0",
+        "L0  I0  I1  L3  ^"
+      ],
+      "stars": {
+        "three": 6,
+        "two": 9
+      },
+      "reward": {
+        "coins": 25,
+        "firstClearBonus": 50
+      },
+      "unlock": {
+        "afterStage": "1-7",
+        "minTotalStars": 0
+      }
+    },
+    {
+      "id": "1-9",
+      "world": 1,
+      "number": 9,
+      "name": "ちいさな工夫",
+      "difficulty": 3,
+      "size": {
+        "width": 5,
+        "height": 5
+      },
+      "grid": [
+        "L1  I0  L0  I0  ..",
+        "G0  L1  L3  L3  ..",
+        "L1  I1  L2  ..  ..",
+        "L3  S0  I1  ..  L0",
+        "..  L2  I0  ..  ^"
+      ],
+      "stars": {
+        "three": 4,
+        "two": 6
+      },
+      "reward": {
+        "coins": 25,
+        "firstClearBonus": 50
+      },
+      "unlock": {
+        "afterStage": "1-8",
+        "minTotalStars": 0
+      }
+    },
+    {
+      "id": "1-10",
+      "world": 1,
+      "number": 10,
+      "name": "終着駅へ",
+      "difficulty": 3,
+      "size": {
+        "width": 5,
+        "height": 5
+      },
+      "grid": [
+        "L1  I1  I1  L0  I0",
+        "I1  I1  I0  L2  L2!",
+        "I0  L3  ..  I1  S0",
+        "L3  G3  ~   ..  L3",
+        "I0  ..  #   ..  .."
+      ],
+      "stars": {
+        "three": 6,
+        "two": 9
+      },
+      "reward": {
+        "coins": 25,
+        "firstClearBonus": 50
+      },
+      "unlock": {
+        "afterStage": "1-9",
+        "minTotalStars": 0
+      }
+    }
+  ]
+}
