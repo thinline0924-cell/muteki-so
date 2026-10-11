@@ -66,9 +66,18 @@ dart run tool/build_sounds.dart   # 効果音・BGM を作り直す
 
 ## 素材について
 
-外部の画像・音声素材は使っていません(ライセンスの心配がない自作素材だけ)。
+絵と音は、このアプリのために作った自作の素材です(外部の画像・音声素材は使っていません)。
 
-- 絵:すべてコード(`lib/ui/painters/`)で描いた仮素材
+- 絵:`tool/art/` に SVG(ベクター画像)で描き、Chromium で PNG/JPEG に書き出して
+  `assets/images/` に置いています。直すときは SVG のプログラムを直して書き出し直します
+  ```
+  NODE_PATH=$(npm root -g) node tool/art/build.cjs        # すべて
+  NODE_PATH=$(npm root -g) node tool/art/build.cjs board  # 名前に board を含むものだけ
+  ```
+  (Node.js と Playwright が必要。アプリを動かすだけなら不要)
+- 文字:Zen Maru Gothic(SIL Open Font License 1.1、商用利用可)。アプリで使う文字だけに絞って
+  `assets/fonts/` に入れています。文章を増やしたら `python3 tool/fonts/subset_fonts.py` で作り直します
+  (足りない文字があると `flutter test` が教えてくれます)。ライセンスは設定画面の「ライセンス」に表示
 - 音:`dart run tool/build_sounds.dart` で波形を計算して作った wav(`assets/sounds/`)
 
 外部の素材を使う場合は、商用利用とアプリ配布が許可されていることを確認し、

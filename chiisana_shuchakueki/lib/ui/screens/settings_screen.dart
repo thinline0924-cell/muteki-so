@@ -15,27 +15,11 @@ class SettingsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final game = GameScope.of(context);
     final s = game.progress.settings;
-    return Scaffold(
+    return GameScaffold(
       body: SafeArea(
         child: Column(
           children: [
-            const Padding(
-              padding: EdgeInsets.fromLTRB(10, 8, 12, 8),
-              child: Row(
-                children: [
-                  RoundBackButton(),
-                  SizedBox(width: 10),
-                  Text(
-                    '設定',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            const ScreenHeader(title: '設定'),
             Expanded(
               child: Container(
                 margin: const EdgeInsets.fromLTRB(10, 0, 10, 10),
@@ -94,6 +78,16 @@ class SettingsScreen extends StatelessWidget {
                         label: '利用規約',
                         title: '利用規約',
                         body: termsText,
+                      ),
+                      ListTile(
+                        leading: const Icon(Icons.copyright_rounded, color: Palette.navy),
+                        title: const Text('ライセンス', style: TextStyle(fontWeight: FontWeight.w700)),
+                        trailing: const Icon(Icons.chevron_right_rounded),
+                        onTap: () => showLicensePage(
+                          context: context,
+                          applicationName: 'ちいさな終着駅',
+                          applicationLegalese: '絵と音はこのアプリのために作った自作の素材です。',
+                        ),
                       ),
                       const Divider(indent: 16, endIndent: 16),
                       ListTile(
@@ -230,29 +224,11 @@ class _TextPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return GameScaffold(
       body: SafeArea(
         child: Column(
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(10, 8, 12, 8),
-              child: Row(
-                children: [
-                  const RoundBackButton(),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      title,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            ScreenHeader(title: title),
             Expanded(
               child: Container(
                 width: double.infinity,

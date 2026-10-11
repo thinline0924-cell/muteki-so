@@ -3,9 +3,10 @@ import 'package:flutter/material.dart';
 import '../../game/catalog.dart';
 import '../../game/sound.dart';
 import '../game_scope.dart';
-import '../painters/item_painter.dart';
+import '../art.dart';
 import '../theme.dart';
 import 'common.dart';
+import 'item_art.dart';
 
 /// 新しく手に入れたものを知らせる(獲得演出)。
 Future<void> showNewItemsDialog(BuildContext context, List<CollectibleItem> items) async {
@@ -15,16 +16,32 @@ Future<void> showNewItemsDialog(BuildContext context, List<CollectibleItem> item
   await showDialog<void>(
     context: context,
     builder: (context) => Dialog(
-      backgroundColor: Palette.cream,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(18, 20, 18, 16),
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      child: PaperPanel(
+        padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              title,
-              style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w900, color: Palette.ink),
+            SizedBox(
+              height: 40,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  Opacity(
+                    opacity: 0.6,
+                    child: ArtImage(Art.ui('rays'), width: 160, height: 160, fit: BoxFit.cover),
+                  ),
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 19,
+                      fontWeight: FontWeight.w900,
+                      color: Palette.ink,
+                    ),
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 12),
             Wrap(
@@ -61,9 +78,14 @@ class NewItemChip extends StatelessWidget {
       width: size + 36,
       padding: const EdgeInsets.fromLTRB(4, 6, 4, 6),
       decoration: BoxDecoration(
-        color: Palette.paper,
+        gradient: const LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0xFFFFFDF6), Color(0xFFF6EBD3)],
+        ),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Palette.star, width: 2),
+        border: Border.all(color: Palette.star, width: 2.5),
+        boxShadow: const [BoxShadow(color: Color(0x33000000), blurRadius: 4, offset: Offset(0, 2))],
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,

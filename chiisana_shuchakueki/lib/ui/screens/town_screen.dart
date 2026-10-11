@@ -5,10 +5,13 @@ import '../../game/game_controller.dart';
 import '../../game/sound.dart';
 import '../../game/town.dart';
 import '../game_scope.dart';
-import '../painters/item_painter.dart';
-import '../painters/town_painter.dart';
+
+import 'dart:math' as math;
+
+import '../art.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
+import '../widgets/item_art.dart';
 import '../widgets/new_items.dart';
 import 'collection_screen.dart';
 import 'shop_screen.dart';
@@ -21,18 +24,22 @@ class TownScreen extends StatefulWidget {
   State<TownScreen> createState() => _TownScreenState();
 }
 
-class _TownScreenState extends State<TownScreen> with SingleTickerProviderStateMixin {
-  late final AnimationController _wave = AnimationController(
-    vsync: this,
-    duration: const Duration(seconds: 5),
-  )..repeat();
+/// 町の設計図の大きさ(区画の座標はこの中の値)
+const townDesignSize = Size(360, 480);
 
-  @override
-  void dispose() {
-    _wave.dispose();
-    super.dispose();
-  }
+/// 住民が立つ場所(設計図の座標、足もと)。持っている住民を順に置く。
+const residentSpots = [
+  Offset(232, 112), // 駅長さんはホーム
+  Offset(95, 168),
+  Offset(270, 166),
+  Offset(206, 202),
+  Offset(188, 264),
+  Offset(172, 332),
+  Offset(188, 400),
+  Offset(130, 440),
+];
 
+class _TownScreenState extends State<TownScreen> {
   Future<void> _openSlot(GameController game, TownSlot slot) async {
     game.play(Sfx.button);
     final chosen = await showModalBottomSheet<String>(
@@ -75,143 +82,130 @@ class _TownScreenState extends State<TownScreen> with SingleTickerProviderStateM
     ];
     final showTip = !game.tutorialSeen('town');
     return Scaffold(
-      body: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(10, 8, 12, 6),
-              child: Row(
-                children: [
-                  const RoundBackButton(),
-                  const SizedBox(width: 10),
-                  const Expanded(
-                    child: Text(
-                      'わたしの終着駅',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
+      body: GameBackground(
+        child: SafeArea(
+          child: Column(
+            children: [
+              ScreenHeader(
+                title: 'わたしの終着駅',
+                trailing: [
                   CounterChip(
                     key: const ValueKey('coins'),
-                    icon: Icons.monetization_on_rounded,
-                    iconColor: Palette.coin,
+                    image: 'coin',
                     text: '${game.progress.coins}',
                   ),
-                  const SizedBox(width: 6),
-                  CounterChip(
-                    icon: Icons.star_rounded,
-                    iconColor: Palette.star,
-                    text: '${game.progress.totalStars}',
-                  ),
+                  CounterChip(image: 'star', text: '${game.progress.totalStars}'),
                 ],
               ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14),
-              child: Row(
-                children: [
-                  const Icon(Icons.location_city_rounded, color: Colors.white70, size: 18),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      TownRules.developmentTitle(placed),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800),
-                    ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                child: Container(
+                  padding: const EdgeInsets.fromLTRB(12, 6, 12, 6),
+                  decoration: BoxDecoration(
+                    color: const Color(0x8812303D),
+                    borderRadius: BorderRadius.circular(14),
                   ),
-                  Text(
-                    '$placed / ${catalog.slots.length}',
-                    style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w700),
-                  ),
-                  const SizedBox(width: 8),
-                  SizedBox(
-                    width: 70,
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(4),
-                      child: LinearProgressIndicator(
-                        value: catalog.slots.isEmpty ? 0 : placed / catalog.slots.length,
-                        minHeight: 8,
-                        color: Palette.star,
-                        backgroundColor: Colors.white24,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 8),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 10),
-                child: Stack(
-                  children: [
-                    Positioned.fill(child: _townView(game, catalog, residents)),
-                    if (showTip)
-                      Positioned(
-                        left: 8,
-                        right: 8,
-                        top: 8,
-                        child: _TownTip(
-                          onClose: () {
-                            game
-                              ..play(Sfx.button)
-                              ..markTutorialSeen('town');
-                          },
+                  child: Row(
+                    children: [
+                      const Icon(Icons.location_city_rounded, color: Palette.star, size: 20),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          TownRules.developmentTitle(placed),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
                         ),
                       ),
+                      Text(
+                        '$placed / ${catalog.slots.length}',
+                        style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w900),
+                      ),
+                      const SizedBox(width: 8),
+                      SizedBox(
+                        width: 72,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(5),
+                          child: LinearProgressIndicator(
+                            value: catalog.slots.isEmpty ? 0 : placed / catalog.slots.length,
+                            minHeight: 10,
+                            color: Palette.star,
+                            backgroundColor: Colors.white24,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  child: Stack(
+                    children: [
+                      Positioned.fill(child: _townView(game, catalog, residents)),
+                      if (showTip)
+                        Positioned(
+                          left: 8,
+                          right: 8,
+                          top: 8,
+                          child: _TownTip(
+                            onClose: () {
+                              game
+                                ..play(Sfx.button)
+                                ..markTutorialSeen('town');
+                            },
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: ChunkyButton(
+                        key: const ValueKey('shop'),
+                        label: 'お店',
+                        icon: Icons.storefront_rounded,
+                        color: Palette.orange,
+                        shadow: Palette.orangeDark,
+                        height: 50,
+                        fontSize: 17,
+                        onPressed: () {
+                          game.play(Sfx.button);
+                          Navigator.of(context)
+                              .push(MaterialPageRoute<void>(builder: (_) => const ShopScreen()));
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: ChunkyButton(
+                        label: '図鑑',
+                        icon: Icons.menu_book_rounded,
+                        color: Palette.purple,
+                        shadow: Palette.purpleDark,
+                        height: 50,
+                        fontSize: 17,
+                        badge: game.newItemCount > 0 ? 'NEW ${game.newItemCount}' : null,
+                        badgeColor: Palette.danger,
+                        onPressed: () {
+                          game.play(Sfx.button);
+                          Navigator.of(
+                            context,
+                          ).push(MaterialPageRoute<void>(builder: (_) => const CollectionScreen()));
+                        },
+                      ),
+                    ),
                   ],
                 ),
               ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: ChunkyButton(
-                      key: const ValueKey('shop'),
-                      label: 'お店',
-                      icon: Icons.storefront_rounded,
-                      color: Palette.orange,
-                      shadow: Palette.orangeDark,
-                      height: 50,
-                      fontSize: 17,
-                      onPressed: () {
-                        game.play(Sfx.button);
-                        Navigator.of(context)
-                            .push(MaterialPageRoute<void>(builder: (_) => const ShopScreen()));
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: ChunkyButton(
-                      label: '図鑑',
-                      icon: Icons.menu_book_rounded,
-                      color: Palette.purple,
-                      shadow: Palette.purpleDark,
-                      height: 50,
-                      fontSize: 17,
-                      badge: game.newItemCount > 0 ? 'NEW ${game.newItemCount}' : null,
-                      badgeColor: Palette.danger,
-                      onPressed: () {
-                        game.play(Sfx.button);
-                        Navigator.of(
-                          context,
-                        ).push(MaterialPageRoute<void>(builder: (_) => const CollectionScreen()));
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -220,48 +214,61 @@ class _TownScreenState extends State<TownScreen> with SingleTickerProviderStateM
   Widget _townView(GameController game, Catalog catalog, List<CollectibleItem> residents) {
     return LayoutBuilder(
       builder: (context, c) {
-        final k = (c.maxWidth / townDesignSize.width) < (c.maxHeight / townDesignSize.height)
-            ? c.maxWidth / townDesignSize.width
-            : c.maxHeight / townDesignSize.height;
+        final k = math.min(c.maxWidth / townDesignSize.width, c.maxHeight / townDesignSize.height);
         final w = townDesignSize.width * k;
         final h = townDesignSize.height * k;
         // 奥(上)から順に描くと、手前のものが前に来る
         final slots = [...catalog.slots]..sort((a, b) => a.y.compareTo(b.y));
         final placed = game.progress.placedBuildings;
         return Center(
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(18),
-            child: SizedBox(
-              width: w,
-              height: h,
+          child: Container(
+            width: w,
+            height: h,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: const Color(0xFFE6D5B2), width: 3),
+              boxShadow: const [
+                BoxShadow(color: Color(0x66000000), blurRadius: 14, offset: Offset(0, 6)),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(17),
               child: Stack(
                 clipBehavior: Clip.none,
                 children: [
-                  Positioned.fill(
-                    child: AnimatedBuilder(
-                      animation: _wave,
-                      builder: (context, _) => CustomPaint(
-                        painter: TownPainter(
-                          station: game.station,
-                          train: game.train,
-                          slots: catalog.slots,
-                          occupied: placed.keys.toSet(),
-                          wave: _wave.value,
-                        ),
-                      ),
+                  Positioned.fill(child: ArtImage(Art.town('background.jpg'), fit: BoxFit.fill)),
+                  // 駅舎と、止まっている列車
+                  Positioned(
+                    left: (180 - 76) * k,
+                    top: 9 * k,
+                    width: 152 * k,
+                    height: 101 * k,
+                    child: IgnorePointer(
+                      child: ItemArt(item: game.station, size: 152 * k),
                     ),
                   ),
+                  Positioned(
+                    left: 6 * k,
+                    top: 76 * k,
+                    width: 118 * k,
+                    height: 49 * k,
+                    child: IgnorePointer(
+                      child: ArtImage(Art.item(game.train.id), fit: BoxFit.fill),
+                    ),
+                  ),
+                  for (final s in slots)
+                    if (placed[s.id] == null) _slotMarker(s, k),
                   for (final s in slots)
                     if (placed[s.id] != null && catalog.item(placed[s.id]!) != null)
                       _placedItem(catalog.item(placed[s.id]!)!, s, k),
                   for (var i = 0; i < residents.length && i < residentSpots.length; i++)
                     Positioned(
-                      left: residentSpots[i].dx * k - 15 * k,
-                      top: residentSpots[i].dy * k - 30 * k,
-                      width: 30 * k,
-                      height: 30 * k,
+                      left: residentSpots[i].dx * k - 17 * k,
+                      top: residentSpots[i].dy * k - 31 * k,
+                      width: 34 * k,
+                      height: 34 * k,
                       child: IgnorePointer(
-                        child: ItemArt(item: residents[i], size: 30 * k),
+                        child: ItemArt(item: residents[i], size: 34 * k),
                       ),
                     ),
                   for (final s in slots) _slotTarget(game, s, k),
@@ -274,6 +281,19 @@ class _TownScreenState extends State<TownScreen> with SingleTickerProviderStateM
     );
   }
 
+  /// 空いている区画の目印(点線の枠と「+」)
+  Widget _slotMarker(TownSlot s, double k) {
+    final large = s.size == 'large';
+    final w = (large ? 82 : 38) * k, h = (large ? 54 : 32) * k;
+    return Positioned(
+      left: s.x * k - w / 2,
+      top: (s.y - (large ? 30 : 18)) * k - h / 2,
+      width: w,
+      height: h,
+      child: IgnorePointer(child: CustomPaint(painter: _SlotMarkerPainter())),
+    );
+  }
+
   double _artSize(TownSlot s) => s.size == 'large' ? 96 : 48;
 
   Widget _placedItem(CollectibleItem item, TownSlot s, double k) {
@@ -281,7 +301,7 @@ class _TownScreenState extends State<TownScreen> with SingleTickerProviderStateM
     return Positioned(
       key: ValueKey('placed-${s.id}-${item.id}'),
       left: s.x * k - size / 2,
-      top: s.y * k - size * 0.93,
+      top: s.y * k - size * 0.91,
       width: size,
       height: size,
       child: IgnorePointer(
@@ -466,4 +486,38 @@ class _SlotSheet extends StatelessWidget {
       ),
     );
   }
+}
+
+class _SlotMarkerPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final r = RRect.fromRectAndRadius(
+      Offset.zero & size,
+      Radius.circular(size.shortestSide * 0.25),
+    );
+    canvas.drawRRect(r, Paint()..color = const Color(0x40FFFFFF));
+    final dash = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = math.max(1.5, size.shortestSide * 0.06);
+    final path = Path()..addRRect(r.deflate(1));
+    for (final m in path.computeMetrics()) {
+      final step = size.shortestSide * 0.22;
+      for (var d = 0.0; d < m.length; d += step) {
+        canvas.drawPath(m.extractPath(d, math.min(d + step * 0.55, m.length)), dash);
+      }
+    }
+    final c = size.center(Offset.zero);
+    final a = size.shortestSide * 0.2;
+    final plus = Paint()
+      ..color = Colors.white
+      ..strokeWidth = math.max(2, size.shortestSide * 0.1)
+      ..strokeCap = StrokeCap.round;
+    canvas.drawCircle(c, a * 1.5, Paint()..color = const Color(0x553F8A52));
+    canvas.drawLine(c - Offset(a, 0), c + Offset(a, 0), plus);
+    canvas.drawLine(c - Offset(0, a), c + Offset(0, a), plus);
+  }
+
+  @override
+  bool shouldRepaint(_SlotMarkerPainter oldDelegate) => false;
 }

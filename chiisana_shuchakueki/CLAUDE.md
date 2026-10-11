@@ -10,7 +10,9 @@
 3. ステージは `assets/stages/*.json`。作り直しは `dart run tool/build_stages.dart`。手で JSON を書き換えたら
    `flutter test` で全ステージの検査(解ける・使い回しなし・★3 = 最少手数)を通す
 4. 外部パッケージは必要性を確かめてから追加する(今は shared_preferences と audioplayers の 2 個)
-5. 外部の画像・音声素材は使わない。絵は `lib/ui/painters/` で描き、音は `tool/build_sounds.dart` で合成する
+5. 外部の画像・音声素材は使わない。絵は `tool/art/*.cjs`(SVG)から `node tool/art/build.cjs` で PNG を作る
+   (NODE_PATH に playwright が必要)。音は `tool/build_sounds.dart` で合成する。
+   文字を増やしたら `python3 tool/fonts/subset_fonts.py` でフォントを作り直す(test/ui/font_test.dart が検査)
 6. 町・コレクションのアイテムは `assets/data/catalog.json`。ルールは `lib/game/town.dart`(純粋な Dart)
 7. 進行状況を変えたら GameController 経由で保存する。セーブデータの形を変えたら `PlayerProgress.fromJson` で古い形も読めるようにする
 8. 秘密鍵・署名情報・API キー・本番の広告 ID をコミットしない

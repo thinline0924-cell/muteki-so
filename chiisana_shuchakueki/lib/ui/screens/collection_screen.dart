@@ -4,7 +4,7 @@ import '../../game/catalog.dart';
 import '../../game/game_controller.dart';
 import '../../game/sound.dart';
 import '../game_scope.dart';
-import '../painters/item_painter.dart';
+import '../widgets/item_art.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 import '../widgets/new_items.dart';
@@ -28,32 +28,22 @@ class CollectionScreen extends StatelessWidget {
     final owned = all.where((i) => game.owns(i.id)).length;
     return DefaultTabController(
       length: tabs.length,
-      child: Scaffold(
+      child: GameScaffold(
         body: SafeArea(
           child: Column(
             children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(10, 8, 14, 4),
-                child: Row(
-                  children: [
-                    const RoundBackButton(),
-                    const SizedBox(width: 10),
-                    const Expanded(
-                      child: Text(
-                        'コレクション',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 20,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
+              ScreenHeader(
+                title: 'コレクション',
+                trailing: [
+                  Text(
+                    '$owned / ${all.length}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 16,
                     ),
-                    Text(
-                      '$owned / ${all.length}',
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
               TabBar(
                 isScrollable: true,
@@ -62,7 +52,7 @@ class CollectionScreen extends StatelessWidget {
                 unselectedLabelColor: Colors.white60,
                 indicatorColor: Palette.star,
                 dividerColor: Colors.transparent,
-                labelStyle: const TextStyle(fontWeight: FontWeight.w800),
+                labelStyle: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15),
                 tabs: [
                   for (final t in tabs)
                     Tab(
@@ -86,12 +76,9 @@ class CollectionScreen extends StatelessWidget {
                 ],
               ),
               Expanded(
-                child: Container(
+                child: PaperPanel(
                   margin: const EdgeInsets.fromLTRB(10, 6, 10, 10),
-                  decoration: BoxDecoration(
-                    color: Palette.cream,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
+                  padding: EdgeInsets.zero,
                   child: TabBarView(
                     children: [for (final t in tabs) _grid(game, game.catalog.ofType(t))],
                   ),

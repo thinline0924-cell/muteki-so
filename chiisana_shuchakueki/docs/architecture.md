@@ -5,7 +5,8 @@
 | 技術 | 用途 | 理由 |
 |---|---|---|
 | Flutter 3.47 / Dart 3.13 | アプリ全体 | 1 つのコードで Android と iOS の両方を作れる。個人で保守しやすい |
-| CustomPainter(Flutter 標準) | 盤面・線路・列車・景色の描画 | 単純な 2D パズルなのでゲームエンジン(Flame など)は不要。依存を増やさない |
+| 自作の絵(SVG → PNG/JPEG) | 盤面・線路・列車・町・建物・住民・タイトル・UI 部品 | `tool/art/` の SVG で質感・影・光沢まで描きこみ、Chromium で書き出す。アプリは画像を並べて回すだけなので軽い。ゲームエンジン(Flame など)は不要 |
+| Zen Maru Gothic(OFL) | 文字 | 温かみのある丸ゴシック。使う文字だけに絞って同梱 |
 | JSON | ステージデータ | コードを変えずにステージを追加・修正できる。人が読める |
 | flutter_localizations(Flutter 同梱) | 日本語表示 | 端末で漢字を日本語の字形で表示させるため(中国語の字形になるのを防ぐ) |
 | shared_preferences 2.5 | セーブデータ | Flutter 公式。小さなデータの保存に十分。保存の窓口(ProgressStore)を分けてあるので、必要なら SQLite へ移せる |
@@ -41,16 +42,20 @@ chiisana_shuchakueki/
 │  └─ ui/                    画面と描画
 │     ├─ screens/             タイトル・ステージ選択・パズル・町・お店・図鑑・設定
 │     ├─ widgets/             盤面・クリア画面・獲得の知らせ・ボタン類
-│     ├─ painters/            線路・駅・障害物・列車・景色・町・アイテムの絵
+│     ├─ art.dart             絵のファイルの場所と先読み
 │     ├─ legal_texts.dart     データの保存について・プライバシーポリシー・利用規約(案)
 │     └─ route_geometry.dart  経路の結果 → 列車アニメーション用の線と弧
 ├─ assets/stages/            ステージ JSON(index.json + world_01〜05.json)
 ├─ assets/data/catalog.json  町・コレクションのアイテムと区画
 ├─ assets/sounds/            効果音・BGM(自作の合成音)
+├─ assets/images/            絵(board/ trains/ items/ town/ ui/)。tool/art/ から書き出したもの
+├─ assets/fonts/             Zen Maru Gothic(使う文字だけ)と OFL.txt
 ├─ tool/                     開発用の道具(アプリには入らない)
 │  ├─ build_stages.dart       ステージ JSON を作る
 │  ├─ stage_generator.dart    盤面の自動生成
 │  ├─ build_sounds.dart       効果音・BGM を合成する
+│  ├─ art/                    絵(SVG)を描くプログラムと、PNG/JPEG への書き出し(Node.js + Playwright)
+│  ├─ fonts/subset_fonts.py   フォントを使う文字だけに絞る
 │  └─ preview/                全ステージ開放で起動する確認用の入口
 ├─ test/                     自動テスト
 └─ docs/                     このドキュメント

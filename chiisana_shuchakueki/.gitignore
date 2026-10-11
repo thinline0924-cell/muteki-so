@@ -46,3 +46,6 @@ app.*.map.json
 
 # Widget Preview related
 .widget_preview/
+
+# フォントの元ファイル(大きいので入れない。tool/fonts/subset_fonts.py が自動で取ってくる)
+/tool/fonts/src/

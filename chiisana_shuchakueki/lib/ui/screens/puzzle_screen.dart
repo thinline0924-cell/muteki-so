@@ -11,6 +11,7 @@ import '../../puzzle/route.dart';
 import '../../puzzle/session.dart';
 import '../../puzzle/solver.dart';
 import '../../puzzle/stage.dart';
+import '../art.dart';
 import '../game_scope.dart';
 import '../messages.dart';
 import '../route_geometry.dart';
@@ -40,10 +41,6 @@ class _PuzzleScreenState extends State<PuzzleScreen> with TickerProviderStateMix
   late PuzzleSession _session = PuzzleSession(widget.stage.board);
   late TrackGeometry _geometry = TrackGeometry.idle(widget.stage.board);
   late final AnimationController _run = AnimationController(vsync: this);
-  late final AnimationController _smoke = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 900),
-  );
 
   _Phase _phase = _Phase.idle;
   RouteResult? _result;
@@ -67,9 +64,6 @@ class _PuzzleScreenState extends State<PuzzleScreen> with TickerProviderStateMix
   void initState() {
     super.initState();
     _run.addListener(() => setState(() {}));
-    _smoke.addListener(() {
-      if (_phase == _Phase.running) setState(() {});
-    });
   }
 
   @override
@@ -83,6 +77,7 @@ class _PuzzleScreenState extends State<PuzzleScreen> with TickerProviderStateMix
     _showTutorial = unseen && tutorialMessage(tut) != null;
     _guided = unseen && tut == 'rotate';
     if (_guided) _updateGuide();
+    Art.precacheBoard(context, game.train.id);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _game.markPlayed(widget.stage);
     });
@@ -91,7 +86,6 @@ class _PuzzleScreenState extends State<PuzzleScreen> with TickerProviderStateMix
   @override
   void dispose() {
     _run.dispose();
-    _smoke.dispose();
     _pulse.dispose();
     super.dispose();
   }
@@ -205,13 +199,11 @@ class _PuzzleScreenState extends State<PuzzleScreen> with TickerProviderStateMix
     });
     final distance = math.max(0.0, _geometry.stopFront - TrackGeometry.startFront);
     _run.duration = Duration(milliseconds: math.max(400, (distance / trainSpeed * 1000).round()));
-    _smoke.repeat();
     try {
       await _run.forward(from: 0).orCancel;
     } on TickerCanceled {
       return; // 画面を閉じた
     }
-    _smoke.stop();
     if (!mounted) return;
     _session.finishRun();
     final game = _game;
@@ -298,136 +290,133 @@ class _PuzzleScreenState extends State<PuzzleScreen> with TickerProviderStateMix
     final compact = screen.height < 700 || screen.width < 360;
 
     return Scaffold(
-      body: Stack(
-        children: [
-          SafeArea(
-            child: Column(
-              children: [
-                _TopBar(stage: stage, moves: _session.moves),
-                Expanded(
-                  child: Container(
-                    margin: EdgeInsets.fromLTRB(
-                      compact ? 6 : 10,
-                      4,
-                      compact ? 6 : 10,
-                      compact ? 6 : 10,
-                    ),
-                    padding: EdgeInsets.all(compact ? 8 : 12),
-                    decoration: BoxDecoration(
-                      color: Palette.cream,
-                      borderRadius: BorderRadius.circular(22),
-                    ),
-                    child: Column(
-                      children: [
-                        if (tutorial != null)
-                          _TutorialCard(
+      body: GameBackground(
+        child: Stack(
+          children: [
+            SafeArea(
+              child: Column(
+                children: [
+                  _TopBar(stage: stage, moves: _session.moves),
+                  Expanded(
+                    child: PaperPanel(
+                      margin: EdgeInsets.fromLTRB(
+                        compact ? 6 : 10,
+                        4,
+                        compact ? 6 : 10,
+                        compact ? 6 : 10,
+                      ),
+                      padding: EdgeInsets.all(compact ? 8 : 12),
+                      child: Column(
+                        children: [
+                          if (tutorial != null)
+                            _TutorialCard(
+                              compact: compact,
+                              text: tutorial,
+                              onClose: () {
+                                game.play(Sfx.button);
+                                setState(() => _showTutorial = false);
+                              },
+                            ),
+                          Expanded(
+                            child: BoardView(
+                              board: _session.board,
+                              onTapTile: _onTapTile,
+                              enabled: !_locked,
+                              hint: _hint?.pos,
+                              hintTaps: _hintTaps,
+                              pointer: _guided,
+                              train: TrainView(
+                                trainId: game.train.id,
+                                geometry: _geometry,
+                                front: _trainFront,
+                                crashed: _phase == _Phase.failed,
+                              ),
+                              crashAt: _crashAt,
+                            ),
+                          ),
+                          SizedBox(height: compact ? 6 : 10),
+                          _StatusLine(
                             compact: compact,
-                            text: tutorial,
-                            onClose: () {
-                              game.play(Sfx.button);
-                              setState(() => _showTutorial = false);
+                            failure: _phase == _Phase.failed && _result != null
+                                ? failureMessage(_result!.outcome)
+                                : null,
+                            text: switch (_phase) {
+                              _Phase.running => '出発進行!',
+                              _Phase.cleared => '到着!',
+                              _ when _guided && _hint != null => '光っている線路をタップしよう',
+                              _ when _guided => '線路がつながった!「出発」を押そう',
+                              _ => _session.moves == 0 ? '線路をタップして回そう' : 'つながったら「出発」!',
                             },
                           ),
-                        Expanded(
-                          child: BoardView(
-                            board: _session.board,
-                            onTapTile: _onTapTile,
-                            enabled: !_locked,
-                            hint: _hint?.pos,
-                            hintTaps: _hintTaps,
-                            pointer: _guided,
-                            train: TrainView(
-                              body: colorOf(game.train.colors['body'], Palette.train),
-                              accent: colorOf(game.train.colors['accent'], Palette.trainAccent),
-                              geometry: _geometry,
-                              front: _trainFront,
-                              crashed: _phase == _Phase.failed,
-                              smokePhase: _smoke.value,
+                          SizedBox(height: compact ? 6 : 10),
+                          ScaleTransition(
+                            scale: Tween(
+                              begin: 1.0,
+                              end: 1.06,
+                            ).animate(CurvedAnimation(parent: _pulse, curve: Curves.easeInOut)),
+                            child: ChunkyButton(
+                              key: const ValueKey('depart'),
+                              height: compact ? 48 : 56,
+                              label: _phase == _Phase.failed ? 'もう一度出発' : '出発',
+                              icon: Icons.play_arrow_rounded,
+                              onPressed: _locked ? null : _depart,
                             ),
-                            crashAt: _crashAt,
                           ),
-                        ),
-                        SizedBox(height: compact ? 6 : 10),
-                        _StatusLine(
-                          compact: compact,
-                          failure: _phase == _Phase.failed && _result != null
-                              ? failureMessage(_result!.outcome)
-                              : null,
-                          text: switch (_phase) {
-                            _Phase.running => '出発進行!',
-                            _Phase.cleared => '到着!',
-                            _ when _guided && _hint != null => '光っている線路をタップしよう',
-                            _ when _guided => '線路がつながった!「出発」を押そう',
-                            _ => _session.moves == 0 ? '線路をタップして回そう' : 'つながったら「出発」!',
-                          },
-                        ),
-                        SizedBox(height: compact ? 6 : 10),
-                        ScaleTransition(
-                          scale: Tween(
-                            begin: 1.0,
-                            end: 1.06,
-                          ).animate(CurvedAnimation(parent: _pulse, curve: Curves.easeInOut)),
-                          child: ChunkyButton(
-                            key: const ValueKey('depart'),
-                            height: compact ? 48 : 56,
-                            label: _phase == _Phase.failed ? 'もう一度出発' : '出発',
-                            icon: Icons.play_arrow_rounded,
-                            onPressed: _locked ? null : _depart,
+                          SizedBox(height: compact ? 6 : 10),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: ToolButton(
+                                  compact: compact,
+                                  icon: Icons.refresh_rounded,
+                                  label: 'リセット',
+                                  onPressed:
+                                      _locked || (_session.moves == 0 && _phase == _Phase.idle)
+                                      ? null
+                                      : _reset,
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: ToolButton(
+                                  compact: compact,
+                                  icon: Icons.undo_rounded,
+                                  label: '1手戻す',
+                                  onPressed: _locked || !_session.canUndo ? null : _undo,
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: ToolButton(
+                                  compact: compact,
+                                  icon: Icons.lightbulb_outline_rounded,
+                                  label: 'ヒント',
+                                  onPressed: _locked ? null : _showHint,
+                                ),
+                              ),
+                            ],
                           ),
-                        ),
-                        SizedBox(height: compact ? 6 : 10),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: ToolButton(
-                                compact: compact,
-                                icon: Icons.refresh_rounded,
-                                label: 'リセット',
-                                onPressed: _locked || (_session.moves == 0 && _phase == _Phase.idle)
-                                    ? null
-                                    : _reset,
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: ToolButton(
-                                compact: compact,
-                                icon: Icons.undo_rounded,
-                                label: '1手戻す',
-                                onPressed: _locked || !_session.canUndo ? null : _undo,
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: ToolButton(
-                                compact: compact,
-                                icon: Icons.lightbulb_outline_rounded,
-                                label: 'ヒント',
-                                onPressed: _locked ? null : _showHint,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
-                ),
-              ],
-            ),
-          ),
-          if (_clear != null)
-            Positioned.fill(
-              child: ClearOverlay(
-                stage: stage,
-                result: _clear!,
-                newItems: _newItems,
-                onRetry: _retry,
-                onNext: nextUnlocked ? () => _goNext(next) : null,
-                onStageSelect: _goStageSelect,
-                onTown: _goTown,
+                ],
               ),
             ),
-        ],
+            if (_clear != null)
+              Positioned.fill(
+                child: ClearOverlay(
+                  stage: stage,
+                  result: _clear!,
+                  newItems: _newItems,
+                  onRetry: _retry,
+                  onNext: nextUnlocked ? () => _goNext(next) : null,
+                  onStageSelect: _goStageSelect,
+                  onTown: _goTown,
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -452,41 +441,61 @@ class _TopBar extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'ステージ ${stage.id}',
-                  style: const TextStyle(
-                    color: Colors.white70,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: const Color(0x55000000),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    'ステージ ${stage.id}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w900,
+                    ),
                   ),
                 ),
+                const SizedBox(height: 2),
                 Text(
                   stage.name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
+                    fontSize: 19,
+                    fontWeight: FontWeight.w900,
+                    shadows: [
+                      Shadow(color: Color(0x66000000), offset: Offset(0, 2), blurRadius: 3),
+                    ],
                   ),
                 ),
               ],
             ),
           ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              StarRow(count: stars, size: 20),
-              Text(
-                '手数 $moves / ★3は${stage.stars.three}手',
-                key: const ValueKey('moves'),
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
+          Container(
+            padding: const EdgeInsets.fromLTRB(10, 5, 10, 5),
+            decoration: BoxDecoration(
+              color: const Color(0xCC12303D),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: const Color(0x33FFFFFF), width: 1.5),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                StarRow(count: stars, size: 22, spacing: 1),
+                const SizedBox(height: 1),
+                Text(
+                  '手数 $moves / ★3は${stage.stars.three}手',
+                  key: const ValueKey('moves'),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ),

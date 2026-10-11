@@ -5,7 +5,8 @@ import '../../game/game_controller.dart';
 import '../../game/sound.dart';
 import '../../game/town.dart';
 import '../game_scope.dart';
-import '../painters/item_painter.dart';
+import '../widgets/item_art.dart';
+import '../art.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 
@@ -22,41 +23,26 @@ class ShopScreen extends StatelessWidget {
     ];
     return DefaultTabController(
       length: 3,
-      child: Scaffold(
+      child: GameScaffold(
         body: SafeArea(
           child: Column(
             children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(10, 8, 12, 4),
-                child: Row(
-                  children: [
-                    const RoundBackButton(),
-                    const SizedBox(width: 10),
-                    const Expanded(
-                      child: Text(
-                        '建物ショップ',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 20,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                    CounterChip(
-                      key: const ValueKey('shop-coins'),
-                      icon: Icons.monetization_on_rounded,
-                      iconColor: Palette.coin,
-                      text: '${game.progress.coins}',
-                    ),
-                  ],
-                ),
+              ScreenHeader(
+                title: '建物ショップ',
+                trailing: [
+                  CounterChip(
+                    key: const ValueKey('shop-coins'),
+                    image: 'coin',
+                    text: '${game.progress.coins}',
+                  ),
+                ],
               ),
               const TabBar(
                 labelColor: Colors.white,
                 unselectedLabelColor: Colors.white60,
                 indicatorColor: Palette.star,
                 dividerColor: Colors.transparent,
-                labelStyle: TextStyle(fontWeight: FontWeight.w800),
+                labelStyle: TextStyle(fontWeight: FontWeight.w900, fontSize: 15),
                 tabs: [
                   Tab(text: 'すべて'),
                   Tab(text: '建物'),
@@ -64,12 +50,9 @@ class ShopScreen extends StatelessWidget {
                 ],
               ),
               Expanded(
-                child: Container(
+                child: PaperPanel(
                   margin: const EdgeInsets.fromLTRB(10, 6, 10, 10),
-                  decoration: BoxDecoration(
-                    color: Palette.cream,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
+                  padding: EdgeInsets.zero,
                   child: TabBarView(
                     children: [
                       _list(game, forSale),
@@ -147,7 +130,7 @@ class _ShopRow extends StatelessWidget {
                 crossAxisAlignment: WrapCrossAlignment.center,
                 spacing: 2,
                 children: [
-                  const Icon(Icons.monetization_on_rounded, color: Palette.coin, size: 18),
+                  ArtImage(Art.ui('coin'), width: 20, height: 20),
                   Text('$price  ', style: const TextStyle(fontWeight: FontWeight.w800)),
                   Text(
                     item.type == ItemType.building ? '大きな区画' : '小さな区画',
@@ -167,16 +150,15 @@ class _ShopRow extends StatelessWidget {
                   textAlign: TextAlign.center,
                   style: TextStyle(color: Palette.green, fontWeight: FontWeight.w900),
                 )
-              : FilledButton(
+              : ChunkyButton(
                   key: ValueKey('buy-${item.id}'),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: enough
-                        ? Palette.green
-                        : Palette.inkSoft.withValues(alpha: 0.4),
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                  ),
+                  label: '購入',
+                  height: 38,
+                  fontSize: 14,
+                  color: Palette.green,
+                  shadow: Palette.greenDark,
+                  muted: !enough,
                   onPressed: () => _buy(context),
-                  child: const Text('購入', style: TextStyle(fontWeight: FontWeight.w900)),
                 ),
         ),
       ],

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../../game/game_controller.dart';
+import '../../game/sound.dart';
 import '../../puzzle/stage.dart';
+import '../art.dart';
 import '../game_scope.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
@@ -15,56 +17,35 @@ class StageSelectScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final game = GameScope.of(context);
     return Scaffold(
-      body: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(10, 8, 12, 8),
-              child: Row(
-                children: [
-                  const RoundBackButton(),
-                  const SizedBox(width: 10),
-                  const Expanded(
-                    child: Text(
-                      'ステージ選択',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-                  CounterChip(
-                    icon: Icons.monetization_on_rounded,
-                    iconColor: Palette.coin,
-                    text: '${game.progress.coins}',
-                  ),
-                  const SizedBox(width: 6),
-                  CounterChip(
-                    icon: Icons.star_rounded,
-                    iconColor: Palette.star,
-                    text: '${game.progress.totalStars}',
-                  ),
+      body: GameBackground(
+        child: SafeArea(
+          child: Column(
+            children: [
+              ScreenHeader(
+                title: 'ステージ選択',
+                trailing: [
+                  CounterChip(image: 'coin', text: '${game.progress.coins}'),
+                  CounterChip(image: 'star', text: '${game.progress.totalStars}'),
                 ],
               ),
-            ),
-            Expanded(
-              child: ListView(
-                padding: const EdgeInsets.fromLTRB(12, 4, 12, 20),
-                children: [
-                  for (final pack in game.packs) _WorldCard(game: game, pack: pack),
-                  if (game.loaded.errors.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 12),
-                      child: Text(
-                        '読みこめなかったステージがあります(${game.loaded.errors.length} 件)',
-                        style: const TextStyle(color: Colors.white70),
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.fromLTRB(12, 4, 12, 24),
+                  children: [
+                    for (final pack in game.packs) _WorldCard(game: game, pack: pack),
+                    if (game.loaded.errors.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 12),
+                        child: Text(
+                          '読みこめなかったステージがあります(${game.loaded.errors.length} 件)',
+                          style: const TextStyle(color: Colors.white70),
+                        ),
                       ),
-                    ),
-                ],
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -83,67 +64,109 @@ class _WorldCard extends StatelessWidget {
     // ワールドの最初のステージに必要な星(足りなければ鍵の札を出す)
     final need = pack.stages.isEmpty ? 0 : pack.stages.first.unlock.minTotalStars;
     final lockedByStars = need > game.progress.totalStars;
-    return Container(
-      margin: const EdgeInsets.only(bottom: 14),
-      decoration: BoxDecoration(color: Palette.cream, borderRadius: BorderRadius.circular(20)),
+    return PaperPanel(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: EdgeInsets.zero,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Container(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-            decoration: const BoxDecoration(
-              color: Palette.paper,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'ワールド ${pack.world}',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w800,
-                          color: Palette.inkSoft,
-                        ),
+          ClipRRect(
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
+            child: SizedBox(
+              height: 92,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  ArtImage(Art.ui('world_${pack.world.clamp(1, 5)}.jpg'), fit: BoxFit.cover),
+                  const DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
+                        colors: [Color(0xCCFFFAF0), Color(0x00FFFAF0)],
+                        stops: [0.3, 0.75],
                       ),
-                      Text(
-                        pack.name,
-                        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
-                      ),
-                      if (lockedByStars)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 4),
-                          child: Row(
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 10, 12, 10),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              const Icon(Icons.lock_rounded, size: 14, color: Palette.inkSoft),
-                              const SizedBox(width: 4),
-                              Flexible(
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
+                                decoration: BoxDecoration(
+                                  color: Palette.navy,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
                                 child: Text(
-                                  '星を $need 個集めると開きます(いま ${game.progress.totalStars} 個)',
+                                  'ワールド ${pack.world}',
                                   style: const TextStyle(
-                                    fontSize: 12,
-                                    color: Palette.inkSoft,
-                                    fontWeight: FontWeight.w700,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w900,
+                                    color: Colors.white,
                                   ),
                                 ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                pack.name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w900),
                               ),
                             ],
                           ),
                         ),
-                    ],
+                        Container(
+                          padding: const EdgeInsets.fromLTRB(4, 3, 10, 3),
+                          decoration: BoxDecoration(
+                            color: const Color(0xE6FFFAF0),
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              ArtImage(Art.ui('star'), width: 22, height: 22),
+                              Text(
+                                ' ${game.starsOf(pack)} / ${game.maxStarsOf(pack)}',
+                                style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                const Icon(Icons.star_rounded, color: Palette.star),
-                Text(
-                  ' ${game.starsOf(pack)} / ${game.maxStarsOf(pack)}',
-                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
+          if (lockedByStars)
+            Container(
+              color: const Color(0xFFF1E4C8),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+              child: Row(
+                children: [
+                  ArtImage(Art.ui('lock'), width: 18, height: 18),
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: Text(
+                      '星を $need 個集めると開きます(いま ${game.progress.totalStars} 個)',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Palette.inkSoft,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           Padding(
             padding: const EdgeInsets.all(12),
             child: LayoutBuilder(
@@ -158,7 +181,7 @@ class _WorldCard extends StatelessWidget {
                     for (final s in pack.stages)
                       SizedBox(
                         width: size,
-                        height: size * 1.08,
+                        height: size * 1.1,
                         child: _StageButton(
                           stage: s,
                           unlocked: game.isUnlocked(s),
@@ -207,64 +230,83 @@ class _StageButton extends StatelessWidget {
     final label = unlocked
         ? 'ステージ ${stage.number} ${stage.name}${cleared ? '、星 $stars 個' : ''}'
         : 'ステージ ${stage.number}、まだ遊べません';
+    final top = unlocked
+        ? (cleared ? const Color(0xFF2F7A8F) : const Color(0xFF2A6378))
+        : const Color(0xFF7F8E94);
+    final bottom = unlocked ? const Color(0xFF1B4656) : const Color(0xFF66747A);
     return Semantics(
       button: unlocked,
       label: label,
       excludeSemantics: true,
       child: Material(
         key: ValueKey('stage-${stage.id}'),
-        color: unlocked ? Palette.navy : const Color(0xFF51666E),
-        borderRadius: BorderRadius.circular(12),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(12),
-          onTap: unlocked
-              ? () =>
-                    Navigator.of(context)
-                        .push(MaterialPageRoute<void>(builder: (_) => PuzzleScreen(stage: stage)))
-              : () => ScaffoldMessenger.of(context)
-                  ..hideCurrentSnackBar()
-                  ..showSnackBar(SnackBar(content: Text(_lockedMessage(context)))),
-          child: Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              border: isNext ? Border.all(color: Palette.orange, width: 3) : null,
+        color: Colors.transparent,
+        child: Ink(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [top, bottom],
             ),
-            child: unlocked
-                ? Padding(
-                    padding: const EdgeInsets.all(6),
-                    child: FittedBox(
-                      child: Column(
+            border: Border.all(
+              color: isNext ? Palette.orange : const Color(0x33000000),
+              width: isNext ? 3 : 1.5,
+            ),
+            boxShadow: [
+              const BoxShadow(color: Color(0x55000000), blurRadius: 3, offset: Offset(0, 3)),
+              if (isNext) const BoxShadow(color: Color(0x88E9763A), blurRadius: 10),
+            ],
+          ),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(14),
+            onTap: unlocked
+                ? () {
+                    GameScope.of(context).play(Sfx.button);
+                    Navigator.of(context)
+                        .push(MaterialPageRoute<void>(builder: (_) => PuzzleScreen(stage: stage)));
+                  }
+                : () => ScaffoldMessenger.of(context)
+                    ..hideCurrentSnackBar()
+                    ..showSnackBar(SnackBar(content: Text(_lockedMessage(context)))),
+            child: Padding(
+              padding: const EdgeInsets.all(5),
+              child: FittedBox(
+                child: unlocked
+                    ? Column(
                         children: [
                           Text(
                             '${stage.number}',
                             style: const TextStyle(
                               color: Colors.white,
-                              fontSize: 24,
+                              fontSize: 26,
                               fontWeight: FontWeight.w900,
+                              shadows: [
+                                Shadow(
+                                  color: Color(0x66000000),
+                                  offset: Offset(0, 2),
+                                  blurRadius: 2,
+                                ),
+                              ],
                             ),
                           ),
-                          StarRow(count: stars, size: 14),
+                          StarRow(count: stars, size: 15),
                         ],
-                      ),
-                    ),
-                  )
-                : Padding(
-                    padding: const EdgeInsets.all(6),
-                    child: FittedBox(
-                      child: Column(
+                      )
+                    : Column(
                         children: [
-                          const Icon(Icons.lock_rounded, color: Colors.white70),
+                          const Icon(Icons.lock_rounded, color: Color(0xFFE3E8EA), size: 24),
                           Text(
                             '${stage.number}',
                             style: const TextStyle(
-                              color: Colors.white70,
-                              fontWeight: FontWeight.w700,
+                              color: Color(0xFFE3E8EA),
+                              fontWeight: FontWeight.w900,
                             ),
                           ),
                         ],
                       ),
-                    ),
-                  ),
+              ),
+            ),
           ),
         ),
       ),

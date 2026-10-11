@@ -3,9 +3,9 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../../puzzle/board.dart';
+import '../../puzzle/direction.dart';
 import '../../puzzle/tile.dart';
-import '../painters/tile_painter.dart';
-import '../painters/train_painter.dart';
+import '../art.dart';
 import '../route_geometry.dart';
 import '../theme.dart';
 
@@ -14,25 +14,24 @@ class TrainView {
   const TrainView({
     required this.geometry,
     required this.front,
+    required this.trainId,
     this.crashed = false,
-    this.smokePhase = 0,
-    this.body = Palette.train,
-    this.accent = Palette.trainAccent,
   });
 
   final TrackGeometry geometry;
-  final double front;
-  final bool crashed;
-  final double smokePhase;
 
-  /// 車体と帯の色(コレクションで選んだ列車)
-  final Color body;
-  final Color accent;
+  /// 先頭の位置(経路の始まりからの距離、マス単位)
+  final double front;
+
+  /// 走らせる列車(コレクションで選んだもの)
+  final String trainId;
+  final bool crashed;
 }
 
 /// 盤面。タイルをタップすると [onTapTile] が呼ばれる。
 ///
 /// 盤面の正しさの判定はせず、受け取った盤面を描くだけ。
+/// 絵は assets/images/board/(1 マス = 256px の自作素材)。
 class BoardView extends StatefulWidget {
   const BoardView({
     super.key,
@@ -114,58 +113,90 @@ class _BoardViewState extends State<BoardView> with SingleTickerProviderStateMix
     return LayoutBuilder(
       builder: (context, c) {
         // 狭い画面では枠を細くして、マスを大きく保つ
-        final frame = c.maxWidth < 320 ? 5.0 : 10.0;
+        final frame = c.maxWidth < 320 ? 4.0 : 11.0;
+        const depth = 8.0; // 盤面の厚み(下に見える木の側面)
         final cell = math
-            .min((c.maxWidth - frame * 2) / b.width, (c.maxHeight - frame * 2) / b.height)
+            .min((c.maxWidth - frame * 2) / b.width, (c.maxHeight - frame * 2 - depth) / b.height)
             .floorToDouble();
         final w = cell * b.width;
         final h = cell * b.height;
         return Center(
-          child: Container(
+          child: SizedBox(
             width: w + frame * 2,
-            height: h + frame * 2,
-            padding: EdgeInsets.all(frame),
-            decoration: BoxDecoration(
-              color: Palette.boardFrame,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: const [
-                BoxShadow(color: Color(0x55000000), blurRadius: 10, offset: Offset(0, 5)),
-              ],
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: SizedBox(
-                width: w,
-                height: h,
-                child: Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    Positioned.fill(
-                      child: CustomPaint(painter: _GroundPainter(b.width, b.height, cell)),
+            height: h + frame * 2 + depth,
+            child: Stack(
+              children: [
+                // 厚み(側面)と落ち影
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  top: depth,
+                  bottom: 0,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF5E3D24),
+                      borderRadius: BorderRadius.circular(18),
+                      boxShadow: const [
+                        BoxShadow(color: Color(0x66000000), blurRadius: 14, offset: Offset(0, 8)),
+                      ],
                     ),
-                    for (final p in b.positions) _tile(p, cell),
-                    if (widget.hint != null) _hintMark(widget.hint!, cell),
-                    if (widget.train != null)
-                      Positioned.fill(
-                        child: IgnorePointer(
-                          child: CustomPaint(
-                            painter: TrainPainter(
-                              geometry: widget.train!.geometry,
-                              front: widget.train!.front,
-                              cellSize: cell,
-                              crashed: widget.train!.crashed,
-                              smokePhase: widget.train!.smokePhase,
-                              body: widget.train!.body,
-                              accent: widget.train!.accent,
-                            ),
-                          ),
-                        ),
-                      ),
-                    if (widget.crashAt != null) _crashMark(widget.crashAt!, cell, b),
-                    if (widget.pointer && widget.hint != null) _pointerMark(widget.hint!, cell),
-                  ],
+                  ),
                 ),
-              ),
+                // 木の枠
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  top: 0,
+                  height: h + frame * 2,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(18),
+                      image: DecorationImage(
+                        image: AssetImage(Art.board('wood')),
+                        repeat: ImageRepeat.repeat,
+                        scale: 2.5,
+                        filterQuality: FilterQuality.medium,
+                      ),
+                      gradient: const LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [Color(0xFFB98557), Color(0xFF8E5E38)],
+                      ),
+                      border: Border.all(color: const Color(0x33FFFFFF), width: 1.5),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  left: frame,
+                  top: frame,
+                  width: w,
+                  height: h,
+                  child: DecoratedBox(
+                    position: DecorationPosition.foreground,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(9),
+                      border: Border.all(color: const Color(0x55301B0C), width: 2),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(9),
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          for (final p in b.positions) _ground(p, cell),
+                          for (final p in b.positions) _tile(p, cell),
+                          if (widget.hint != null) _hintMark(widget.hint!, cell),
+                          if (widget.train != null) ..._train(widget.train!, cell),
+                          for (final p in b.positions)
+                            if (b.at(p).kind.isStation) _stationLabel(p, b.at(p), cell),
+                          if (widget.crashAt != null) _crashMark(widget.crashAt!, cell, b),
+                          if (widget.pointer && widget.hint != null)
+                            _pointerMark(widget.hint!, cell),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         );
@@ -173,28 +204,63 @@ class _BoardViewState extends State<BoardView> with SingleTickerProviderStateMix
     );
   }
 
+  Widget _ground(Pos p, double cell) {
+    final tile = widget.board.at(p);
+    final seed = (p.x * 73856093) ^ (p.y * 19349663);
+    final flowers = tile.kind == TileKind.empty && seed % 3 == 0;
+    return Positioned(
+      left: p.x * cell,
+      top: p.y * cell,
+      width: cell,
+      height: cell,
+      child: IgnorePointer(
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            ArtImage(Art.board((p.x + p.y).isEven ? 'grass_a' : 'grass_b'), fit: BoxFit.fill),
+            if (flowers) ArtImage(Art.board('flowers_${1 + (seed ~/ 3).abs() % 4}')),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _tile(Pos p, double cell) {
     final tile = widget.board.at(p);
     final index = p.y * widget.board.width + p.x;
-    Widget child;
+    Widget? child;
     if (tile.kind.isTrack) {
+      final name = switch (tile.kind) {
+        TileKind.straight => 'track_straight',
+        TileKind.curve => 'track_curve',
+        TileKind.tee => 'track_tee',
+        _ => 'track_cross',
+      };
       child = Stack(
+        fit: StackFit.expand,
         children: [
-          Positioned.fill(
-            child: CustomPaint(painter: TilePlatePainter(fixed: !tile.canRotate)),
-          ),
-          Positioned.fill(
-            child: AnimatedRotation(
-              turns: _turns[index] / 4,
-              duration: const Duration(milliseconds: 160),
-              curve: Curves.easeOutBack,
-              child: CustomPaint(painter: TrackPainter(tile.kind)),
-            ),
+          ArtImage(Art.board(tile.canRotate ? 'plate' : 'plate_fixed')),
+          AnimatedRotation(
+            turns: _turns[index] / 4,
+            duration: const Duration(milliseconds: 180),
+            curve: Curves.easeOutBack,
+            child: ArtImage(Art.board(name)),
           ),
         ],
       );
-    } else {
-      child = CustomPaint(painter: StaticTilePainter(tile, seed: index * 7919 + 13));
+    } else if (tile.kind.isStation) {
+      child = RotatedBox(
+        quarterTurns: tile.rotation,
+        child: ArtImage(Art.board(tile.kind == TileKind.goal ? 'station_goal' : 'station_start')),
+      );
+    } else if (tile.kind.isObstacle) {
+      child = ArtImage(
+        Art.board(switch (tile.kind) {
+          TileKind.tree => 'tree',
+          TileKind.rock => 'rock',
+          _ => 'pond',
+        }),
+      );
     }
     return Positioned(
       key: ValueKey('tile-${p.x}-${p.y}'),
@@ -208,10 +274,75 @@ class _BoardViewState extends State<BoardView> with SingleTickerProviderStateMix
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTap: widget.enabled && tile.canRotate ? () => widget.onTapTile(p) : null,
-          child: child,
+          child: child ?? const SizedBox.expand(),
         ),
       ),
     );
+  }
+
+  /// 駅の札(「出発」「終点」)。屋根と反対側に、回さずに出す
+  Widget _stationLabel(Pos p, Tile tile, double cell) {
+    final goal = tile.kind == TileKind.goal;
+    final side = Dir.west.rotatedCw(tile.rotation);
+    final vertical = side == Dir.east || side == Dir.west;
+    final text = goal ? '終点' : '出発';
+    final color = goal ? const Color(0xFF2F6797) : const Color(0xFFC0442F);
+    final fs = math.max(9.0, cell * 0.15);
+    final label = Container(
+      padding: EdgeInsets.symmetric(horizontal: fs * 0.35, vertical: fs * 0.2),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(fs * 0.4),
+        border: Border.all(color: Colors.white, width: math.max(1, fs * 0.12)),
+        boxShadow: const [BoxShadow(color: Color(0x55000000), blurRadius: 3, offset: Offset(0, 1))],
+      ),
+      child: Text(
+        vertical ? text.split('').join('\n') : text,
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: fs,
+          height: 1.05,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+    );
+    final align = switch (side) {
+      Dir.north => const Alignment(0, -0.78),
+      Dir.east => const Alignment(0.8, 0.1),
+      Dir.south => const Alignment(0, 0.78),
+      Dir.west => const Alignment(-0.8, 0.1),
+    };
+    return Positioned(
+      left: p.x * cell,
+      top: p.y * cell,
+      width: cell,
+      height: cell,
+      child: IgnorePointer(
+        child: Align(alignment: align, child: label),
+      ),
+    );
+  }
+
+  /// 列車(先頭車と客車)。絵は右向きなので、進む向きに回して置く
+  List<Widget> _train(TrainView t, double cell) {
+    const imgW = 150 / 256, imgH = 112 / 256;
+    const locoLen = 116 / 256, coachLen = 104 / 256, gap = 0.035;
+    final locoAt = t.geometry.at(t.front - locoLen / 2);
+    final coachAt = t.geometry.at(t.front - locoLen - gap - coachLen / 2);
+    Widget car(({Offset pos, double angle}) at, bool loco) => Positioned(
+      left: (at.pos.dx - imgW / 2) * cell,
+      top: (at.pos.dy - imgH / 2) * cell,
+      width: imgW * cell,
+      height: imgH * cell,
+      child: IgnorePointer(
+        child: Transform.rotate(
+          angle: at.angle,
+          child: ArtImage(Art.trainTop(t.trainId, loco: loco)),
+        ),
+      ),
+    );
+    return [car(coachAt, false), car(locoAt, true)];
   }
 
   Widget _hintMark(Pos p, double cell) {
@@ -277,13 +408,7 @@ class _BoardViewState extends State<BoardView> with SingleTickerProviderStateMix
         child: child!,
       ),
       child: IgnorePointer(
-        child: Icon(
-          Icons.touch_app_rounded,
-          key: const ValueKey('pointer'),
-          size: size,
-          color: Colors.white,
-          shadows: const [Shadow(color: Color(0xAA000000), blurRadius: 6)],
-        ),
+        child: ArtImage(Art.ui('hand'), key: const ValueKey('pointer'), width: size, height: size),
       ),
     );
   }
@@ -333,26 +458,4 @@ class _BoardViewState extends State<BoardView> with SingleTickerProviderStateMix
     final extra = t.canRotate ? '、タップで回る' : (t.kind.isTrack ? '、固定' : '');
     return '${p.x + 1}列${p.y + 1}行 $name$extra';
   }
-}
-
-class _GroundPainter extends CustomPainter {
-  _GroundPainter(this.w, this.h, this.cell);
-
-  final int w;
-  final int h;
-  final double cell;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final a = Paint()..color = Palette.grass;
-    final b = Paint()..color = Palette.grassAlt;
-    for (var y = 0; y < h; y++) {
-      for (var x = 0; x < w; x++) {
-        canvas.drawRect(Rect.fromLTWH(x * cell, y * cell, cell, cell), (x + y).isEven ? a : b);
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(_GroundPainter old) => old.w != w || old.h != h || old.cell != cell;
 }

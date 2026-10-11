@@ -64,10 +64,12 @@ ThemeData buildTheme() {
     surface: Palette.cream,
   );
   return ThemeData(
+    fontFamily: 'ZenMaruGothic',
     colorScheme: scheme,
     scaffoldBackgroundColor: Palette.navy,
     useMaterial3: true,
     textTheme: Typography.blackMountainView.apply(
+      fontFamily: 'ZenMaruGothic',
       bodyColor: Palette.ink,
       displayColor: Palette.ink,
     ),
