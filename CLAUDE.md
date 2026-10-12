@@ -23,3 +23,11 @@
 | `js/game.js` | 進行(タイトル・事件の準備・文章・選択肢・時間・セーブ・推理・対決) |
 | `js/pixel.js` | ドット絵(320×180)。`Pixel.draw / portrait / hotspots / personSpots` |
 | `js/audio.js` | Web Audio で BGM・環境音・効果音を合成。`Sound.bgm / ambient / se` |
+
+## もう一つのゲーム: `neon-fps/`(夜光区 — サイバー市街の FPS)
+- `neon-fps/index.html` を開くと遊べる。公開時は `/neon-fps/` で開ける(Render はリポジトリ全体を公開している)
+- 約束 1・2 はこちらも同じ(ビルドなし・ES modules なし・file:// で動く・画像/音声ファイルなし)。外部ライブラリも入れない(WebGL2 レンダラーは `js/gl.js` に自作)
+- 約束 3〜5(灰緑の配色・事件番号)は推理ゲームだけの決まり。FPS の HUD は「こげ茶の線画+クリーム色+オリーブ」、赤は被弾と大事な警告だけ
+- 区画は seed から作る(`js/city.js`)。乱数は `NF.M.rng(seed)` を使う
+- 変更したら、ブラウザで1区を通しで遊び、波 → 改造チップ → 店 → 次の区 まで進めるか確かめる
+- 詳しくは `neon-fps/README.md`
