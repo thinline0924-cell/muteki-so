@@ -1,7 +1,7 @@
 /* game.js — 押すな。の進行
-   ・何もしなければ倍率が上がる。画面下の帯から上へスワイプで利確(受け取って終了)
-   ・出てくる誘惑を押したら全損。本物のボーナスだけは押すと ×3
-   ・ヒビが入ったら数秒以内に利確しないと全損 */
+   ・何もしなければ倍率が上がる。画面下の帯から上へスワイプで受け取って終了
+   ・出てくる誘惑を押したら全損(賭けた枚数が0)。本物のボーナスだけは押すと ×3
+   ・ヒビが入ったら数秒以内に受け取らないと全損 */
 (function () {
   'use strict';
   const W = 360, H = 640, LANE_Y = 584;
@@ -15,33 +15,27 @@
 
   // ---------- 誘惑とルールの一覧 ----------
   const TEMPT = {
-    hype:    { name: '煽り', desc: '「今タップで×10!」と急かしてくる。', w: 200, h: 72, life: 2.6, se: 'hype' },
-    clear:   { name: 'ニセ大当り', desc: '終わったように見せかける。まだ終わっていない。', w: 260, h: 120, life: 2.4, se: 'fanfare' },
-    coin:    { name: '落ちるメダル', desc: '思わず触りたくなる。', w: 48, h: 48, life: 2.4, se: 'coin' },
-    bonus:   { name: 'ニセボーナス', desc: '本物そっくり。見分けは「前兆」。', w: 92, h: 92, life: 1.3, se: 'fakeChime' },
-    phone:   { name: '着信', desc: '棚の横のケータイが鳴る。出たら負け。', w: 56, h: 100, life: 3.0, se: 'ring' },
-    error:   { name: 'ニセ通信エラー', desc: '「再接続」はワナ。ゲームの演出です。', w: 236, h: 118, life: 2.8, se: 'error' },
-    notify:  { name: 'あおり通知', desc: '「抜かれた!」に反応しない。', w: 250, h: 60, life: 2.4, se: 'notify' },
-    under:   { name: '指の下のボタン', desc: '最後に触った場所に出てくる。', w: 110, h: 50, life: 1.6, se: 'click' },
-    capsule: { name: '無料ガチャ', desc: 'タダより高いものはない。', w: 120, h: 166, life: 2.6, se: 'gacha' },
-    dice:    { name: 'ゾロ目チャンス', desc: '止めなくていい。', w: 184, h: 92, life: 2.4, se: 'dice' },
-    silence: { name: '静寂', desc: '音も絵も止まって画面が白くなる。待てば戻る。' },
+    hype:    { name: '煽り', desc: '「今タップで×10!」と急かしてくる。押したら0枚。', w: 200, h: 72, life: 2.6, se: 'hype' },
+    clear:   { name: 'ニセ大当り', desc: '「大当り!」と終わったふりをする。まだ勝負中。', w: 260, h: 120, life: 2.4, se: 'fanfare' },
+    coin:    { name: '落ちるメダル', desc: '上からメダルが落ちてくる。触ったら0枚。', w: 48, h: 48, life: 2.4, se: 'coin' },
+    bonus:   { name: 'ニセボーナス', desc: '本物そっくりのボーナス。音と同時に出たら偽物。', w: 92, h: 92, life: 1.3, se: 'fakeChime' },
+    phone:   { name: '着信', desc: '棚の横のケータイが鳴る。出たら0枚。', w: 56, h: 100, life: 3.0, se: 'ring' },
+    error:   { name: 'ニセ通信エラー', desc: '「電波が途切れた」と出る。これもゲームの罠。', w: 236, h: 118, life: 2.8, se: 'error' },
+    notify:  { name: 'あおり通知', desc: '「抜かれた!」と言ってくる。気にしない。', w: 250, h: 60, life: 2.4, se: 'notify' },
+    under:   { name: '指の下のボタン', desc: '最後に指を置いた場所にボタンが出る。', w: 110, h: 50, life: 1.6, se: 'click' },
+    capsule: { name: '無料ガチャ', desc: '「1回無料」のガチャ。押したら0枚。', w: 120, h: 166, life: 2.6, se: 'gacha' },
+    dice:    { name: 'ゾロ目チャンス', desc: '「ゾロ目で×10」と誘う。止めなくていい。', w: 184, h: 92, life: 2.4, se: 'dice' },
+    silence: { name: '静寂', desc: '音も絵も止まって画面が白くなる。「タップして再開」も罠。待てば元に戻る。' },
     resume:  { name: '再開ボタン', w: 170, h: 44, life: 9 }
   };
   const RULES = {
-    A: { name: '前兆', desc: '本物は「チリン」と鳴って窓のネオン「大当り」が光ったすぐあとに、音なしで出る。音と同時に出るのは偽物。' },
-    B: { name: '上半分', desc: '本物は画面の上半分(窓のあたり)にしか出ない。' },
-    L: { name: '下半分', desc: '今日の本物は画面の下半分にしか出ない。' },
-    C: { name: '脈打つ輪', desc: '本物は外側の輪がドクドク脈打つ。' },
+    A: { name: '前兆', desc: 'チリン♪と鳴って、窓の看板「大当り」が光る。そのすぐあとに出るボーナスが本物。' },
+    B: { name: '上半分', desc: '本物は画面の上半分(窓のあたり)にしか出ない。下半分に出たら偽物。' },
+    L: { name: '下半分', desc: '今日は本物が画面の下半分にしか出ない。上半分に出たら偽物。' },
+    C: { name: '脈打つ輪', desc: '本物は外側の輪がドクドク動いている。' },
     S: { name: '傾き', desc: '今日の本物は少し右に傾いている。' },
-    F: { name: '偽の前兆', desc: '前兆のあと、ひと呼吸以上おいて出るのは偽物(出るときにも音が鳴る)。' }
+    F: { name: '偽の前兆', desc: 'チリン♪のあと、少し間があいて出るのは偽物。本物は「すぐあと」。' }
   };
-  const BASICS = [
-    { k: 'base', name: '待つ', desc: '何もしなければ倍率が上がる。10秒で×2、30秒で×10、60秒で×50。' },
-    { k: 'base', name: '利確', desc: '画面下の帯に指を置いて上へスワイプ。その倍率で受け取って終了(パソコンは ↑キー)。' },
-    { k: 'base', name: 'ヒビ', desc: 'ヒビが入ったら数秒以内に利確。間に合わないと全損。' },
-    { k: 'base', name: '押すな', desc: '出てくるものを押したら全損。ただし本物のボーナスだけは押すと ×3。何もない所は押しても平気。' }
-  ];
   const ALLT = ['hype', 'clear', 'coin', 'bonus', 'phone', 'error', 'notify', 'under', 'capsule', 'dice'];
   // ステージ:target=クリアに必要な倍率 grace=ヒビの猶予(秒) haz=ヒビの来やすさ win=本物を押せる時間(秒)
   const STAGES = [
@@ -175,7 +169,8 @@
       crack: null, crackAt: 0, nextBeep: 0, sil: null,
       realGot: 0, missed: null, hitTarget: false, swipe: null, paused: false,
       hint: nextHint || (kind === 'stage' && stage === 1 && S.cleared === 0),
-      res: null, revived: false, readyT: 0, readyPh: 0, dieT: 0, outT: 0, shown: false
+      res: null, revived: false, readyT: 0, readyPh: 0, dieT: 0, outT: 0, shown: false,
+      tut: kind === 'stage' && stage === 1, tip: null, tipT: false   // ステージ1は勝負中にヒントを出す
     };
     nextHint = false;
     if (cfg.silence && rp() < 0.7) R.sil = { at: 12 + rp() * 22, dur: 2.6 + rp() * 1.4, on: false, done: false, btn: false };
@@ -205,6 +200,7 @@
       S.interAt = S.rounds; save();
       await Monetize.interstitial();
     }
+    if (!S.seen.how) await openHowto();
     const key = kind === 'stage' ? 's' + stage : 'daily';
     const intro = introFor(kind, stage);
     if (intro && !S.seen[key]) { await showIntro(intro); S.seen[key] = 1; save(); }
@@ -275,10 +271,15 @@
     }
     if (o.lane) tp.y = Math.min(H - tp.h * 0.6, LANE_Y - tp.h * 0.35 + rs() * 12);
     if (!tp.real && T.se) Sound.se(T.se);
+    if (!tp.real && type !== 'resume' && !R.tipT && R.t > 1) { R.tipT = true; tip('これは誘惑。押すと全部なくなる!', 3); }
     R.tempters.push(tp);
     return tp;
   }
-  function presign() { R.neonT = R.t; Sound.se('presign'); }
+  function presign(real) {
+    R.neonT = R.t; Sound.se('presign');
+    if (real) tip('チリン♪ このあと出るボーナスは本物。押して!', 2.2);
+  }
+  function tip(text, dur) { if (R && R.tut) R.tip = { lines: text.split(/(?<=。)/), until: R.t + dur }; }
 
   function makeRays(cx, cy) {
     const rays = [], n = 9 + Math.floor(Math.random() * 4);
@@ -305,7 +306,8 @@
     R.nextBeep = R.t + 0.3;
     Sound.se('crack'); shake(10); flash(0.5); vib([60, 30, 60]);
     popup('ヒビ!', W / 2, 262, 40, true);
-    // 山場:利確しようとする指の先(下の帯)に偽物を置く
+    tip('ヒビ! 急いで下の帯を上にスワイプ!', R.cfg.grace);
+    // 山場:受け取ろうとする指の先(下の帯)に偽物を置く
     if (R.kind !== 'stage' || R.stage >= 2) addTempter('bonus', { lane: true });
     if (R.kind !== 'stage' || R.stage >= 3) addTempter('hype', { lane: true });
   }
@@ -319,7 +321,7 @@
       R.readyT += dt;
       if (R.readyPh === 0) { R.readyPh = 1; Sound.se('ready'); }
       if (R.readyPh === 1 && R.readyT > 0.7) { R.readyPh = 2; Sound.se('stamp'); shake(4); }
-      if (R.readyT > 1.35) { mode = 'play'; Sound.se('go'); }
+      if (R.readyT > 1.35) { mode = 'play'; Sound.se('go'); tip('いまは何もしないで待つだけ。倍率がどんどん上がる', 4); }
     } else if (mode === 'play') {
       if (!R.paused) updatePlay(dt);
     } else if (mode === 'dying') {
@@ -357,7 +359,7 @@
 
     // 本物:前兆(音とネオン)→ 0.45秒後に音なしで出る
     for (const r of R.reals) {
-      if (!r.preDone && t >= r.pre) { r.preDone = true; if (!silent) presign(); }
+      if (!r.preDone && t >= r.pre) { r.preDone = true; if (!silent) presign(true); }
       if (!r.appDone && t >= r.app) {
         r.appDone = true;
         if (!silent) { const tp = addTempter('bonus', { real: true }); if (R.hint) { tp.hint = true; R.hint = false; } }
@@ -391,7 +393,10 @@
     const step = m < 5 ? 0.1 : m < 20 ? 0.25 : m < 100 ? 1 : 5;
     const k = Math.floor(m / step);
     if (k !== R.tk) { R.tk = k; if (!silent && clock - R.lastTick > 0.05) { R.lastTick = clock; Sound.se('tick', m); } }
-    if (R.kind === 'stage' && !R.hitTarget && m >= cfg.target) { R.hitTarget = true; popup('目標達成', W / 2, 300, 22); Sound.se('win'); }
+    if (R.kind === 'stage' && !R.hitTarget && m >= cfg.target) {
+      R.hitTarget = true; popup('目標達成', W / 2, 300, 22); Sound.se('win');
+      tip('目標達成! もう受け取ってクリアできる。まだ待ってもいい', 5);
+    }
     Sound.intensity(Math.log(m) / Math.log(60));
   }
 
@@ -533,6 +538,7 @@
     }
     drawLane();
     drawHUD();
+    if (R.tip && R.t < R.tip.until && mode === 'play' && !silent) drawTip(R.tip.lines);
     if (silent) {
       ctx.globalAlpha = 0.97; ctx.fillStyle = P.paper; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1;
       Ink.txt(ctx, '……', W / 2, 250, 22, { h: true, c: P.shade });
@@ -577,7 +583,7 @@
       Ink.line(ctx, ax, ay - 4, ax + 9, ay + 5, 2.2, P.glow);
     });
     ctx.globalAlpha = 1;
-    Ink.txt(ctx, hot ? '今すぐ ↑ 利確!' : '↑ ここから上へスワイプで利確', W / 2, y + 28, hot ? 18 : 14, { h: true, c: P.glow });
+    Ink.txt(ctx, hot ? '今すぐ ↑ 上にスワイプ!' : '↑ ここを上にスワイプで受け取る', W / 2, y + 28, hot ? 18 : 14, { h: true, c: P.glow });
     if (hot) {
       const left = Math.max(0, R.cfg.grace - (R.t - R.crack.t0)), cx = W - 40, cy = y - 36;
       ctx.beginPath(); ctx.arc(cx, cy, 22, 0, 7); ctx.fillStyle = P.ink; ctx.fill();
@@ -593,6 +599,16 @@
     Ink.txt(ctx, '手持ち ' + fmt(S.coins), 10, 18, 12, { h: true, c: P.glow, al: 'left' });
     Ink.txt(ctx, R.kind === 'stage' ? 'STAGE ' + R.stage : (R.kind === 'daily' ? '今日の一発' : '練習'), W / 2, 18, 13, { c: P.glow });
     Ink.txt(ctx, 'BET ' + fmt(R.bet), W - 10, 18, 12, { h: true, c: P.glow, al: 'right' });
+  }
+
+  // ステージ1のヒント帯(押しても何も起きない。ただの字幕)
+  function drawTip(lines) {
+    const P = Ink.P, h = 10 + lines.length * 20;
+    ctx.globalAlpha = 0.94; ctx.fillStyle = P.glow; ctx.fillRect(0, 36, W, h); ctx.globalAlpha = 1;
+    ctx.fillStyle = P.ink; ctx.fillRect(0, 36 + h, W, 2);
+    ctx.fillStyle = P.red; ctx.fillRect(8, 42, 42, 20);
+    Ink.txt(ctx, 'ヒント', 29, 52, 11, { h: true, c: P.glow });
+    lines.forEach((l, i) => Ink.txt(ctx, l, 58, 52 + i * 20, 14, { h: true, al: 'left' }));
   }
 
   function drawHint(tp) {
@@ -638,7 +654,7 @@
     const P = Ink.P, k = Math.min(1, R.outT / 0.8);
     const s = 1 + Math.max(0, 1 - R.outT / 0.12) * 1.2;
     ctx.save(); ctx.translate(W / 2, 330); ctx.rotate(-0.05); ctx.scale(s, s);
-    Ink.txt(ctx, '利確!', 0, 0, 64, { c: P.glow, sw: 9 });
+    Ink.txt(ctx, 'ゲット!', 0, 0, 64, { c: P.glow, sw: 9 });
     ctx.restore();
     Ink.txt(ctx, '+' + fmt(R.res.pay * k) + ' 枚', W / 2, 392, 28, { c: P.glow, sw: 6 });
   }
@@ -667,7 +683,14 @@
   }
 
   // ---------- 画面(メニュー類) ----------
-  function show(id) { document.querySelectorAll('#ui .scr').forEach(s => { s.hidden = s.id !== id; }); }
+  // 下のタブを出す画面と、そのタブの名前
+  const TABBED = { 'scr-home': 'home', 'scr-menu': 'menu', 'scr-daily': 'daily', 'scr-shop': 'shop', 'scr-rec': 'rec' };
+  function show(id) {
+    document.querySelectorAll('#ui .scr').forEach(s => { s.hidden = s.id !== id; });
+    const tab = TABBED[id];
+    $('tabs').hidden = !tab;
+    document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === tab));
+  }
   let toastT = 0;
   function toast(msg) {
     const el = $('toast');
@@ -675,26 +698,55 @@
     el.textContent = msg; el.hidden = false;
     clearTimeout(toastT); toastT = setTimeout(() => { el.hidden = true; }, 2400);
   }
-  function setCoins() { document.querySelectorAll('.v-coins').forEach(e => { e.textContent = fmt(S.coins); }); $('t-coins').textContent = fmt(S.coins); }
+  function setCoins() { document.querySelectorAll('.v-coins').forEach(e => { e.textContent = fmt(S.coins); }); }
 
   function goTitle() {
     mode = 'menu'; R = null;
-    if (S.bonusDate !== today()) {
-      const first = !S.bonusDate;
-      S.bonusDate = today(); S.coins += 300; save();
-      setTimeout(() => toast(first ? 'はじめての配給 +300枚' : '今日の配給 +300枚'), 400);
-    }
-    const d = dailyState();
-    $('t-daily').textContent = d.played ? '(今日は挑戦済み)' : '(未挑戦)';
-    setCoins();
     show('scr-title');
     Sound.music('menu');
+  }
+
+  // ---------- ホーム ----------
+  const RANKS = ['見習い', '見習い', '駆け出し', '駆け出し', '常連', '常連', '勝負師', '勝負師', '鉄の指', '鉄の指', '伝説'];
+  function goHome() {
+    mode = 'menu'; R = null; D = null; held = 0;
+    renderHome();
+    show('scr-home');
+    Sound.music('menu');
+  }
+  function renderHome() {
+    const d = dailyState(), next = Math.min(10, S.cleared + 1), st = STAGES[next - 1];
+    setCoins();
+    $('h-rank').textContent = RANKS[S.cleared];
+    $('h-best').textContent = S.rec.mult > 0
+      ? '最高 ×' + fmtM(S.rec.mult) + '  ・  最長 ' + S.rec.hold.toFixed(1) + '秒'
+      : 'まだ記録なし';
+    $('h-bonus').hidden = S.bonusDate === today();
+    $('h-stage').textContent = 'STAGE ' + next;
+    $('h-goal').textContent = S.cleared >= 10
+      ? 'ぜんぶクリア! 好きなステージで稼ごう'
+      : '倍率 ×' + st.target + ' 以上で受け取ればクリア';
+    $('h-prog').style.width = (S.cleared * 10) + '%';
+    $('h-daily-s').textContent = d.played ? (d.best ? '×' + fmtM(d.best) + '(済)' : '挑戦済み') : '未挑戦';
+  }
+  function claimBonus() {
+    if (S.bonusDate === today()) return;
+    S.bonusDate = today(); S.coins += 300; save();
+    Sound.se('cashout'); coinRain(30); vib([15, 30, 15]);
+    toast('今日の配給 +300枚');
+    renderHome();
   }
   function goMenu() {
     mode = 'menu'; R = null; D = null; held = 0;
     renderMenu();
     show('scr-menu');
     Sound.music('menu');
+  }
+  function openHowto(back) {
+    return new Promise(resolve => {
+      show('scr-howto');
+      Howto.open(() => { S.seen.how = 1; save(); if (back) back(); resolve(); });
+    });
   }
   function curBet() { return S.betAll ? S.coins : Math.min(S.bet, S.coins); }
   function renderMenu() {
@@ -711,7 +763,7 @@
       g.appendChild(b);
     });
     const st = STAGES[selStage - 1];
-    $('m-stage').textContent = 'ステージ' + selStage + ':×' + st.target + ' 以上で利確するとクリア。ヒビの猶予 ' + st.grace.toFixed(1) + '秒。';
+    $('m-stage').textContent = 'ステージ' + selStage + ':倍率が ×' + st.target + ' 以上のときに受け取ればクリア。ヒビが入ってから ' + st.grace.toFixed(1) + '秒 で全損。';
     const bx = $('bets'); bx.innerHTML = '';
     [10, 50, 100, 500, 'ALL'].forEach(v => {
       const b = document.createElement('button'), all = v === 'ALL', amt = all ? S.coins : v;
@@ -741,13 +793,13 @@
       ] };
     }
     const cur = STAGES[stage - 1], prev = stage > 1 ? STAGES[stage - 2] : { types: [], rules: [], silence: false };
-    const items = stage === 1 ? BASICS.slice() : [];
+    const items = [];
     cur.rules.filter(r => !prev.rules.includes(r)).forEach(r => items.push({ k: 'rule', name: RULES[r].name, desc: RULES[r].desc }));
     cur.types.filter(t => !prev.types.includes(t)).forEach(t => items.push({ k: 't', name: TEMPT[t].name, desc: TEMPT[t].desc }));
     if (cur.silence && !prev.silence) items.push({ k: 't', name: TEMPT.silence.name, desc: TEMPT.silence.desc });
-    if (cur.grace < prev.grace) items.push({ k: 'base', name: 'ヒビ', desc: 'ヒビの猶予が ' + cur.grace.toFixed(1) + '秒 に短くなる。' });
+    if (cur.grace < prev.grace) items.push({ k: 'base', name: 'ヒビ', desc: 'ヒビが入ってから全損までが ' + cur.grace.toFixed(1) + '秒 に縮む。' });
     if (!items.length) return null;
-    return { head: stage === 1 ? 'あそびかた' : 'ステージ' + stage + ' で増えるもの', items };
+    return { head: stage === 1 ? 'ステージ1 に出てくるもの' : 'ステージ' + stage + ' で増えるもの', items };
   }
   function showIntro(intro) {
     return new Promise(resolve => {
@@ -783,7 +835,7 @@
     $('r-mult').textContent = '×' + fmtM(res.m);
     $('r-mult').className = 'bigmult' + (res.win ? '' : ' lost');
     if (res.win) {
-      $('r-head').textContent = '利確!';
+      $('r-head').textContent = 'ゲット!';
       note(res.t.toFixed(1) + '秒 耐えた');
       if (R.realGot) note('本物を ' + R.realGot + ' 回見抜いた(×3)');
       if (R.missed != null) note(R.missed.toFixed(1) + '秒の本物を見逃した');
@@ -796,7 +848,7 @@
           stamp.textContent = 'CLEAR'; stamp.hidden = false; Sound.se('stamp');
           if (R.stage > S.cleared) { S.cleared = R.stage; if (R.stage < 10) { selStage = R.stage + 1; note('ステージ' + (R.stage + 1) + ' が開いた'); } else note('全ステージ制覇!'); }
         } else note('目標 ×' + cfg.target + ' に届かず(ステージは未クリア)', true);
-        if (held > 0) addBtn('倍プッシュ(丁か半か)', 'btn red', openDouble);
+        if (held > 0) addBtn('倍か0か に挑戦(丁半)', 'btn red', openDouble);
         addBtn('受け取る', 'btn big', goMenu);
         addBtn('もう一回(BET ' + fmt(R.bet) + ')', 'btn', retry);
       } else if (k === 'daily') {
@@ -816,7 +868,7 @@
         if (tp.type === 'resume') note('静寂はワナ。待てば元に戻る', true);
         else if (tp.type === 'bonus') note('それはニセボーナス。本物は「チリン」が先で、絵は音なしで出る', true);
         else note('「' + TEMPT[tp.type].name + '」は誘惑。押したら全損', true);
-      } else note('ヒビが入ってから ' + cfg.grace.toFixed(1) + '秒以内に ↑スワイプで利確', true);
+      } else note('ヒビが入ったら ' + cfg.grace.toFixed(1) + '秒以内に、下の帯を上にスワイプして受け取る', true);
       const nx = MS.find(v => v > res.m);
       if (nx) { const need = invBase(nx / R.factor) - res.t; if (need > 0 && need < 30) note('あと ' + need.toFixed(1) + '秒 耐えれば ×' + nx + ' だった'); }
       if (R.missed != null) note('本物は ' + R.missed.toFixed(1) + '秒に出ていた');
@@ -857,13 +909,13 @@
     const res = R && R.res;
     if (!res) return;
     const where = R.kind === 'daily' ? '今日の一発(' + today() + ')' : 'STAGE ' + R.stage;
-    const text = '押すな。' + where + ' ×' + fmtM(res.m) + (res.win ? 'で利確' : 'で全損') + '(' + res.t.toFixed(1) + '秒 耐えた) #押すな';
+    const text = '押すな。' + where + ' ×' + fmtM(res.m) + (res.win ? 'でゲット' : 'で全損') + '(' + res.t.toFixed(1) + '秒 耐えた) #押すな';
     try {
       navigator.clipboard.writeText(text).then(() => toast('結果をコピーした'), () => toast(text));
     } catch (e) { toast(text); }
   }
 
-  // ---------- 倍プッシュ(丁半) ----------
+  // ---------- 倍か0か(丁半) ----------
   function setDie(el, n) {
     const on = { 0: [], 1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8] }[n];
     let h = '';
@@ -881,7 +933,7 @@
     dmsg('いま <b>' + fmt(D.amt) + '</b> 枚 → 当たれば <b>' + fmt(D.amt * 2) + '</b> 枚');
     $('d-pick').hidden = false;
     $('d-take').disabled = false;
-    $('d-take').textContent = '降りて受け取る(' + fmt(D.amt) + '枚)';
+    $('d-take').textContent = 'やめて受け取る(' + fmt(D.amt) + '枚)';
     show('scr-double');
   }
   function choose(even) {
@@ -913,7 +965,7 @@
           } else {
             dmsg(lbl + '! 当たり → <b>' + fmt(D.amt) + '</b> 枚。続ければ <b>' + fmt(D.amt * 2) + '</b> 枚', 'win');
             $('d-pick').hidden = false;
-            $('d-take').textContent = '降りて受け取る(' + fmt(D.amt) + '枚)';
+            $('d-take').textContent = 'やめて受け取る(' + fmt(D.amt) + '枚)';
           }
         } else {
           D.amt = 0; D.over = true;
@@ -1013,15 +1065,18 @@
     Sound.init();
     if (e.target.closest('.btn, .back')) Sound.se('click');
     const g = e.target.closest('[data-go]');
-    if (g && g.dataset.go === 'title') goTitle();
+    if (g && g.dataset.go === 'home') goHome();
   });
   $('warn-ok').onclick = () => { S.warned = true; save(); goTitle(); };
   $('warn-calm').onclick = () => { S.warned = true; S.set.calm = true; save(); goTitle(); };
-  $('b-play').onclick = goMenu;
-  $('b-daily').onclick = goDaily;
-  $('b-rec').onclick = showRec;
-  $('b-shop').onclick = showShop;
-  $('b-set').onclick = () => { renderSet(); show('scr-set'); };
+  $('scr-title').onclick = () => { Sound.init(); Sound.se('click'); goHome(); };
+  $('h-set').onclick = () => { renderSet(); show('scr-set'); };
+  $('h-bonus').onclick = claimBonus;
+  $('h-go').onclick = () => { selStage = Math.min(10, S.cleared + 1); goMenu(); };
+  $('h-daily').onclick = goDaily;
+  $('h-how').onclick = () => openHowto(goHome);
+  const TAB_GO = { home: goHome, menu: goMenu, daily: goDaily, shop: showShop, rec: showRec };
+  document.querySelectorAll('#tabs button').forEach(b => { b.onclick = () => { Sound.se('click'); TAB_GO[b.dataset.tab](); }; });
   $('b-go').onclick = () => start('stage', selStage, curBet());
   $('b-hint').onclick = () => Monetize.rewarded('本物を1回教えてもらう').then(ok => { if (ok) { nextHint = true; toast('次の勝負で、本物を1回だけ教えます'); renderMenu(); } });
   $('d-cho').onclick = () => choose(true);
@@ -1043,7 +1098,7 @@
   $('set-sound').onclick = () => { S.set.sound = !S.set.sound; Sound.setOn(S.set.sound); save(); renderSet(); };
   $('set-vib').onclick = () => { S.set.vib = !S.set.vib; save(); renderSet(); vib(30); };
   $('set-calm').onclick = () => { S.set.calm = !S.set.calm; save(); renderSet(); };
-  $('set-how').onclick = () => showIntro(introFor('stage', 1)).then(() => { renderSet(); show('scr-set'); });
+  $('set-how').onclick = () => openHowto(() => { renderSet(); show('scr-set'); });
   let resetArm = 0;
   $('set-reset').onclick = () => {
     if (Date.now() - resetArm > 3000) { resetArm = Date.now(); $('set-reset').textContent = '本当に消す?(もう一度押す)'; return; }
@@ -1052,7 +1107,7 @@
 
   // ---------- 起動 ----------
   // キャンバスに書く文字のフォントを先に読みこむ(読めなくても代わりのフォントで動く)
-  const CANVAS_TEXT = '押すな。大当り穴今タップで×10!!0123456789.BONUS次へ▶電波が途切れたみたい…(このままだと記録が消えます)再接続に抜かれた見に行く★押して着信1回無料ゾロ目で止めろタップして再開秒耐えた枚目標クリアあとは欲との勝負手持ちSTAGE今日の一発練習BET利確全損崩れたヒビREADY本物これが今すぐ↑ここから上へスワイプ……+達成' + WHO.join('');
+  const CANVAS_TEXT = '押すな。大当り穴今タップで×10!!0123456789.BONUS次へ▶電波が途切れたみたい…(このままだと記録が消えます)再接続に抜かれた見に行く★押して着信1回無料ゾロ目で止めろタップして再開秒耐えた枚目標クリアあとは欲との勝負手持ちSTAGE今日の一発練習BET受け取るゲット全損崩れたヒビREADY本物これが今すぐ↑ここを上にスワイプ……+達成ヒント何もしないで待つ倍率がどんどん上がる誘惑押すと全部なくなる!チリン♪このあと出るボーナスは押して!いつでも下の帯受け取れまだ待ってもいいヒビ!急いで' + WHO.join('');
   function loadFonts() {
     if (!document.fonts || !document.fonts.load) return Promise.resolve();
     const p = Promise.all([

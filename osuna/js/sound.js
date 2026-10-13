@@ -3,7 +3,8 @@
    Sound.music(mode) : 'menu'(ローファイの和音) / 'play'(心音と低いうなり) / 'off'
    Sound.se(name)    : 効果音
    Sound.intensity(x): 0〜1。勝負中の緊張度(心音が速くなる)
-   Sound.duck(true)  : 「静寂」の演出で全部の音を消す */
+   Sound.duck(true)  : 「静寂」の演出で全部の音を消す
+   曲ファイル js/bgm-data.js があれば、合成の曲のかわりにその曲を流す(下の「曲ファイル」)。 */
 const Sound = (function () {
   'use strict';
   let ac = null, master = null, mus = null, sfx = null, noiseBuf = null;
@@ -27,6 +28,7 @@ const Sound = (function () {
     const d = noiseBuf.getChannelData(0);
     for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
     crackle();
+    loadSong();
     setInterval(tick, 60);
     applyMusic();
   }
@@ -177,7 +179,54 @@ const Sound = (function () {
     d.g1.gain.setTargetAtTime(0.0001, t, 0.1); d.g2.gain.setTargetAtTime(0, t, 0.05);
     d.o1.stop(t + 0.6); d.o2.stop(t + 0.6);
   }
+  // ---------- 曲ファイル(js/bgm-data.js があるとき) ----------
+  // bgm-data.js は window.OSUNA_BGM = { data: mp3をbase64にした文字, loopStart: 秒, loopEnd: 秒 } を置くだけのファイル。
+  // 文字にして JS に入れておくと、index.html をダブルクリックで開いた時(file://)でも読める。
+  // 前奏を1回流したあと、loopStart〜loopEnd をつなぎ目なしでくり返す(AudioBufferSourceNode の loop)。
+  // 勝負中は曲をこもらせて小さくし、その上に心音を重ねる。
+  let song = null;
+  const SONG_MIX = { menu: { vol: 0.75, lp: 18000 }, play: { vol: 0.32, lp: 650 }, off: { vol: 0.1, lp: 900 } };
+  function loadSong() {
+    const B = window.OSUNA_BGM;
+    if (!B || song) return;
+    song = { buf: null, src: null, gain: null, lp: null, played: false };
+    let failed = false;
+    const ng = () => { if (failed) return; failed = true; song = null; mode = 'off'; applyMusic(); };  // 読めなければ合成の曲にもどす
+    let bytes;
+    try {
+      const bin = atob(B.data);
+      bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    } catch (e) { ng(); return; }
+    try {
+      const p = ac.decodeAudioData(bytes.buffer, buf => { if (song) { song.buf = buf; mixSong(); } }, ng);
+      if (p && p.catch) p.catch(ng);
+    } catch (e) { ng(); }
+  }
+  function mixSong() {
+    if (!song || !song.buf) return;
+    const t = ac.currentTime, mx = SONG_MIX[want] || SONG_MIX.menu;
+    if (!song.src) {
+      const B = window.OSUNA_BGM, d = song.buf.duration;
+      const src = ac.createBufferSource();
+      src.buffer = song.buf;
+      src.loop = true;
+      src.loopStart = Math.max(0, Math.min(B.loopStart, d - 1));
+      src.loopEnd = Math.max(src.loopStart + 0.5, Math.min(B.loopEnd, d));
+      const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = mx.lp; lp.Q.value = 0.5;
+      const gain = ac.createGain(); gain.gain.setValueAtTime(0.0001, t);
+      src.connect(lp); lp.connect(gain); gain.connect(master);
+      // 2回目からは前奏をとばして、ループの頭から
+      src.start(t + 0.05, song.played ? src.loopStart : 0);
+      song.played = true;
+      Object.assign(song, { src, lp, gain });
+    }
+    song.gain.gain.setTargetAtTime(mx.vol, t, want === 'off' ? 0.08 : 0.6);
+    song.lp.frequency.setTargetAtTime(mx.lp, t, 0.25);
+  }
+
   function applyMusic() {
+    if (song) mixSong();
     if (!ac || want === mode) return;
     if (mode === 'play') stopDrone();
     mode = want;
@@ -190,6 +239,7 @@ const Sound = (function () {
     applyMusic();
     const ahead = ac.currentTime + 0.25;
     if (mode === 'menu') {
+      if (song) nextBar = ahead;   // 曲ファイルがあるときは合成の曲を鳴らさない
       while (nextBar < ahead) { playBar(nextBar, barNo++); nextBar += BAR; }
     } else if (mode === 'play') {
       while (nextBeat < ahead) { heartbeat(nextBeat); nextBeat += 60 / (56 + inten * 96); }
