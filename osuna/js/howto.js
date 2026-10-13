@@ -64,28 +64,15 @@ const Howto = (function () {
   }
   const HYPE = { id: 3, type: 'hype', x: 50, y: 26, w: 200, h: 72, life: 99 };
   const BONUS = { id: 4, type: 'bonus', x: 150, y: 34, w: 92, h: 92, life: 99 };
-  let CRACK = null;
-  function crackData() {
-    if (CRACK) return CRACK;
-    const R = Ink.rng(21), rays = [], cx = 110, cy = 62;
-    for (let i = 0; i < 10; i++) {
-      let a = i / 10 * Math.PI * 2 + R() * 0.4, x = cx, y = cy;
-      const pts = [[x, y]];
-      for (let k = 0; k < 4 + Math.floor(R() * 7); k++) { a += (R() - 0.5) * 0.5; x += Math.cos(a) * 16; y += Math.sin(a) * 16; pts.push([x, y]); }
-      rays.push(pts);
-    }
-    CRACK = { x: cx, y: cy, rays, seed: 3 };
-    return CRACK;
-  }
 
   // ---------- ページ ----------
   const PAGES = [
     {
       head: '① 待つほど増える',
-      text: '勝負が始まったら、<b>何もしないで待つ</b>だけ。倍率がどんどん上がって、もらえる枚数(賭けた枚数×倍率)も増えていきます。',
+      text: '勝負が始まると、倍率が<b>少しずつ上がって</b>いきます。もらえる枚数は「賭けた枚数×倍率」。',
       loop: 7,
       draw(g, t) {
-        const P = Ink.P, m = Math.exp(Math.min(t, 6) * 0.38);
+        const P = Ink.P, m = Math.exp(Math.min(t, 6) * 0.12);
         city(g, t);
         Ink.txt(g, Math.min(t, 6).toFixed(1) + '秒 待った', VW / 2, 20, 12, { h: true, c: P.glow });
         g.save(); g.shadowColor = P.glow; g.shadowBlur = 10;
@@ -116,7 +103,79 @@ const Howto = (function () {
       }
     },
     {
-      head: '③ 出てくるものは押すな',
+      head: '③ スロットが勝手に回る',
+      text: '壁の<b>運命スロット</b>は勝手に回って止まります。<b>3つそろうと倍率アップ</b>。さらに「フィーバー」で、しばらく倍率が速く上がります。',
+      loop: 4,
+      draw(g, t, at) {
+        const P = Ink.P;
+        g.fillStyle = P.shade; g.fillRect(0, 0, VW, VH);
+        Ink.seed(4 + Math.floor(t * 7), 0.6);
+        for (let i = 0; i < 3; i++) {
+          const x = 78 + i * 52, stopAt = 0.6 + i * 0.3;
+          Ink.rect(g, x, 12, 44, 58, P.glow, 1.6);
+          g.save(); g.beginPath(); g.rect(x + 1, 13, 42, 56); g.clip();
+          if (t < stopAt) {
+            const off = t * 14 + i * 3;
+            for (let k = -1; k <= 1; k++) Ink.symbol(g, Ink.STRIP[(Math.floor(off) - k + 120) % Ink.STRIP.length], x + 22, 41 + (k + off % 1) * 46, 0.9);
+          } else Ink.symbol(g, 'seven', x + 22, 41, 1);
+          g.restore();
+          if (at(stopAt)) Sound.se('reel');
+        }
+        if (at(1.25)) Sound.se('jackpot');
+        if (t > 1.25) {
+          g.fillStyle = P.red; g.fillRect(76, 40, 152, 2.5);
+          stamp(g, '大当り!! ×7', VW / 2, 92, 26, P.glow, t - 1.25);
+        }
+        const pays = [['cherry', '×1.5'], ['bell', '×2'], ['bar', '×3'], ['seven', '×7']];
+        pays.forEach((pp, i) => {
+          const x = 30 + i * 70;
+          Ink.symbol(g, pp[0], x, 140, 0.55);
+          Ink.txt(g, pp[1], x + 30, 141, 14, { c: P.glow });
+        });
+        Ink.txt(g, '3つそろうと', 12, 118, 11, { h: true, c: P.glow, al: 'left' });
+      }
+    },
+    {
+      head: '④ ドクロ3つで全損',
+      text: 'ドクロが出るたびに<b>ヒビが1本</b>。<b>3本で全損</b>です。あと1本の時は「<b>リーチ</b>」でゆっくり止まります。受け取って逃げるか、賭けて待つか。くぐり抜けたら×1.2。',
+      loop: 6.4,
+      draw(g, t, at) {
+        const P = Ink.P, escape = t < 3.2, lt = escape ? t : t - 3.2;
+        g.fillStyle = P.shade; g.fillRect(0, 0, VW, VH);
+        Ink.seed(4 + Math.floor(t * 7), 0.6);
+        Ink.txt(g, escape ? '逃げたとき' : '賭けたとき', VW - 8, 12, 12, { h: true, c: escape ? P.glow : P.red, al: 'right' });
+        Ink.txt(g, 'ヒビ', 14, 16, 11, { c: P.glow, al: 'left' });
+        for (let k = 0; k < 3; k++) { g.globalAlpha = k < 2 || (!escape && lt > 1.9) ? 1 : 0.25; Ink.symbol(g, 'skull', 52 + k * 24, 16, 0.4); }
+        g.globalAlpha = 1;
+        const syms = ['bell', 'cherry'];
+        for (let i = 0; i < 3; i++) {
+          const x = 78 + i * 52;
+          Ink.rect(g, x, 30, 44, 58, P.glow, 1.6);
+          g.save(); g.beginPath(); g.rect(x + 1, 31, 42, 56); g.clip();
+          const stopAt = i < 2 ? 0.2 + i * 0.25 : 1.9;
+          if (lt < stopAt || (i === 2 && escape)) {
+            const v = i === 2 ? Math.max(1.5, 14 - lt * 7) : 14, off = lt * v + i * 3;
+            for (let k = -1; k <= 1; k++) Ink.symbol(g, Ink.STRIP[(Math.floor(off) - k + 120) % Ink.STRIP.length], x + 22, 59 + (k + off % 1) * 46, 0.9);
+          } else Ink.symbol(g, i === 2 ? 'skull' : syms[i], x + 22, 59, 1);
+          g.restore();
+          if (i === 2 && lt > 0.5 && lt < 1.9) { g.strokeStyle = P.red; g.lineWidth = 3; g.globalAlpha = 0.5 + 0.5 * Math.sin(t * 18); g.strokeRect(x - 2, 28, 48, 62); g.globalAlpha = 1; }
+        }
+        if (lt > 0.5 && lt < 1.9) Ink.txt(g, 'リーチ!', VW / 2, 108, 24, { c: P.red, sw: 5, sc: P.ink });
+        lane(g, t, lt > 0.5 && lt < 1.9 && escape, escape ? '↑ ここを上にスワイプ' : '');
+        if (escape) {
+          if (lt > 1.0 && lt < 1.6) { const y = lt < 1.2 ? 150 : 150 - (lt - 1.2) / 0.3 * 70; finger(g, 250, y, lt < 1.2); }
+          if (lt > 1.45) stamp(g, '逃げ切り! +210枚', VW / 2, 80, 26, P.glow, lt - 1.45);
+        } else {
+          if (at(3.2 + 1.9)) Sound.se('crack');
+          if (lt > 1.9) {
+            g.globalAlpha = 0.5; g.fillStyle = P.ink; g.fillRect(0, 0, VW, VH); g.globalAlpha = 1;
+            stamp(g, '全損', VW / 2, 80, 46, P.red, lt - 1.9);
+          }
+        }
+      }
+    },
+    {
+      head: '⑤ 出てくるものは押すな',
       text: '勝負中は「今タップで×10!」などが次々に出て、押させようとしてきます。<b>押したら賭けた枚数が0</b>(全損)。何もない所なら押しても平気です。',
       loop: 3.6,
       draw(g, t) {
@@ -135,7 +194,7 @@ const Howto = (function () {
       }
     },
     {
-      head: '④ 本物だけは押す',
+      head: '⑥ 本物だけは押す',
       text: '<b>本物のボーナス</b>は押すと倍率×3。本物は「チリン♪」と鳴って窓の看板「大当り」が光った<b>すぐあと</b>に、音なしで出ます。音と同時に出るのは<b>偽物</b>。',
       loop: 6,
       draw(g, t, at) {
@@ -162,28 +221,7 @@ const Howto = (function () {
       }
     },
     {
-      head: '⑤ ヒビが入ったら急いで',
-      text: '時間がたつと画面に<b>ヒビ</b>が入ります。そうなったら<b>数秒以内</b>に受け取らないと全損。どこまで欲張るかの勝負です。',
-      loop: 3.8,
-      draw(g, t) {
-        const P = Ink.P, hot = t > 0.4 && t < 1.95;
-        city(g, t);
-        if (t <= 1.95) Ink.txt(g, '×6.80', VW / 2, 44, 32, { c: P.glow });
-        if (t > 0.4) Ink.crack(g, crackData(), t - 0.4);
-        lane(g, t, hot, hot ? '今すぐ ↑ 受け取れ!' : '↑ ここを上にスワイプ');
-        if (t > 0.4 && t < 1.95) {
-          const left = Math.max(0, 3 - (t - 0.4) * 1.6);
-          g.beginPath(); g.arc(266, 100, 18, 0, 7); g.fillStyle = P.ink; g.fill();
-          g.beginPath(); g.arc(266, 100, 18, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * left / 3);
-          g.lineWidth = 4; g.strokeStyle = P.red; g.stroke();
-          Ink.txt(g, left.toFixed(1), 266, 101, 12, { c: P.glow });
-        }
-        if (t > 1.4 && t < 2.1) { const y = t < 1.6 ? 150 : 150 - Math.min(1, (t - 1.6) / 0.3) * 80; finger(g, 80, y, t < 1.6); }
-        if (t > 1.95) stamp(g, 'セーフ!', VW / 2, 92, 38, P.glow, t - 1.95);
-      }
-    },
-    {
-      head: '⑥ 賭けて、倍か0か',
+      head: '⑦ 賭けて、倍か0か',
       text: '勝負の前に<b>賭ける枚数</b>を選びます。勝ったあとは「<b>倍か0か</b>」にも挑戦できます。サイコロ2つの合計が偶数(丁)か奇数(半)かを当てれば2倍、外れたら0枚。',
       loop: 3.6,
       draw(g, t) {

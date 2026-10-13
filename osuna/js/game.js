@@ -1,7 +1,8 @@
 /* game.js — 押すな。の進行
-   ・何もしなければ倍率が上がる。画面下の帯から上へスワイプで受け取って終了
-   ・出てくる誘惑を押したら全損(賭けた枚数が0)。本物のボーナスだけは押すと ×3
-   ・ヒビが入ったら数秒以内に受け取らないと全損 */
+   ・倍率は少しずつ上がる。画面下の帯から上へスワイプで受け取って終了
+   ・壁の「運命スロット」が勝手に回る。そろえば倍率アップ(777で×7とフィーバー)
+   ・ドクロが出るたびにヒビ1本。3本で全損。あと1本の時は「リーチ」でゆっくり止まる(逃げるか賭けるか)
+   ・出てくる誘惑を押したら全損(賭けた枚数が0)。本物のボーナスだけは押すと ×3 */
 (function () {
   'use strict';
   const W = 360, H = 640, LANE_Y = 584;
@@ -10,7 +11,7 @@
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const fmt = n => Math.floor(n).toLocaleString('ja-JP');
   const fmtM = m => m < 100 ? m.toFixed(2) : m < 1000 ? m.toFixed(1) : String(Math.floor(m));
-  const MS = [2, 3, 5, 10, 20, 50, 100, 200, 500, 1000];   // 倍率の節目
+  const MS = [1.5, 2, 3, 4, 5, 7, 10, 15, 20, 30, 50, 100, 200, 500, 1000];   // 倍率の節目
   const WHO = ['タヌ吉', 'ミケ子', '隣のおっちゃん', 'ナニワの虎', '元カレ'];
 
   // ---------- 誘惑とルールの一覧 ----------
@@ -37,24 +38,29 @@
     F: { name: '偽の前兆', desc: 'チリン♪のあと、少し間があいて出るのは偽物。本物は「すぐあと」。' }
   };
   const ALLT = ['hype', 'clear', 'coin', 'bonus', 'phone', 'error', 'notify', 'under', 'capsule', 'dice'];
-  // ステージ:target=クリアに必要な倍率 grace=ヒビの猶予(秒) haz=ヒビの来やすさ win=本物を押せる時間(秒)
+  // ステージ:target=クリアに必要な倍率 s0=ドクロの出やすさ(時間とともに増える) grace=リーチの長さ(秒) win=本物を押せる時間(秒)
   const STAGES = [
-    { target: 2,  types: ['hype', 'clear', 'coin'], rules: ['A'], grace: 3.0, haz: 0.0011, win: 1.15 },
-    { target: 3,  types: ['hype', 'clear', 'coin', 'bonus'], rules: ['A'], grace: 3.0, haz: 0.0012, win: 1.05 },
-    { target: 4,  types: ['hype', 'clear', 'coin', 'bonus', 'phone'], rules: ['A'], grace: 3.0, haz: 0.0013, win: 1.0, silence: true },
-    { target: 5,  types: ['hype', 'clear', 'coin', 'bonus', 'phone', 'error'], rules: ['A', 'B'], grace: 2.8, haz: 0.0013, win: 0.95, silence: true },
-    { target: 6,  types: ['hype', 'clear', 'coin', 'bonus', 'phone', 'error', 'notify', 'under'], rules: ['A', 'B'], grace: 2.8, haz: 0.0014, win: 0.9, silence: true },
-    { target: 8,  types: ['hype', 'clear', 'coin', 'bonus', 'phone', 'error', 'notify', 'under', 'capsule'], rules: ['A', 'B'], grace: 2.7, haz: 0.0015, win: 0.9, silence: true },
-    { target: 10, types: ALLT, rules: ['A', 'B', 'C'], grace: 2.6, haz: 0.0015, win: 0.9, silence: true },
-    { target: 12, types: ALLT, rules: ['A', 'B', 'C', 'F'], grace: 2.5, haz: 0.0016, win: 0.85, silence: true },
-    { target: 15, types: ALLT, rules: ['A', 'B', 'C', 'F'], grace: 2.3, haz: 0.0017, win: 0.85, silence: true },
-    { target: 20, types: ALLT, rules: ['A', 'B', 'C', 'F'], grace: 2.0, haz: 0.0018, win: 0.8, silence: true }
+    { target: 1.5, types: ['hype', 'clear', 'coin'], rules: ['A'], s0: 0.07, grace: 2.6, win: 1.15 },
+    { target: 2,   types: ['hype', 'clear', 'coin', 'bonus'], rules: ['A'], s0: 0.08, grace: 2.5, win: 1.05 },
+    { target: 2.5, types: ['hype', 'clear', 'coin', 'bonus', 'phone'], rules: ['A'], s0: 0.09, grace: 2.4, win: 1.0, silence: true },
+    { target: 3,   types: ['hype', 'clear', 'coin', 'bonus', 'phone', 'error'], rules: ['A', 'B'], s0: 0.10, grace: 2.3, win: 0.95, silence: true },
+    { target: 3.5, types: ['hype', 'clear', 'coin', 'bonus', 'phone', 'error', 'notify', 'under'], rules: ['A', 'B'], s0: 0.10, grace: 2.2, win: 0.9, silence: true },
+    { target: 4,   types: ['hype', 'clear', 'coin', 'bonus', 'phone', 'error', 'notify', 'under', 'capsule'], rules: ['A', 'B'], s0: 0.11, grace: 2.1, win: 0.9, silence: true },
+    { target: 5,   types: ALLT, rules: ['A', 'B', 'C'], s0: 0.11, grace: 2.0, win: 0.9, silence: true },
+    { target: 6,   types: ALLT, rules: ['A', 'B', 'C', 'F'], s0: 0.12, grace: 1.9, win: 0.85, silence: true },
+    { target: 8,   types: ALLT, rules: ['A', 'B', 'C', 'F'], s0: 0.12, grace: 1.8, win: 0.85, silence: true },
+    { target: 10,  types: ALLT, rules: ['A', 'B', 'C', 'F'], s0: 0.13, grace: 1.7, win: 0.8, silence: true }
   ];
   function dailyCfg() {
     const r = Ink.rng(todaySeed() * 7 + 3);
     const rule = ['B', 'L', 'C', 'S'][Math.floor(r() * 4)];
-    return { target: 0, types: ALLT, rules: ['A', rule, 'F'], grace: 2.5, haz: 0.0015, win: 0.9, silence: true, rule };
+    return { target: 0, types: ALLT, rules: ['A', rule, 'F'], s0: 0.11, grace: 2.0, win: 0.9, silence: true, rule };
   }
+  // 運命スロットの絵柄。そろった時の倍率と、1つのリールに出る割合
+  const SYMS = ['cherry', 'bell', 'bar', 'seven', 'blank'];
+  const SYM_W = [0.30, 0.22, 0.16, 0.08, 0.24];
+  const PAYS = { cherry: 1.5, bell: 2, bar: 3, seven: 7 };
+  const SYM_NAME = { cherry: 'チェリー', bell: 'ベル', bar: 'BAR', seven: '7', skull: 'ドクロ', blank: '' };
 
   // ---------- セーブ(ブラウザに保存。消えても遊べる) ----------
   const KEY = 'osuna.save.v1';
@@ -96,28 +102,11 @@
   function vib(p) { if (S.set.vib && navigator.vibrate) { try { navigator.vibrate(p); } catch (e) { /* 非対応 */ } } }
 
   // ---------- 倍率の伸び方 ----------
-  // 10秒で×2、30秒で×10、60秒で×50。その先も同じ勢いで伸びる
-  const CURVE = [[0, 0], [10, Math.log(2)], [30, Math.log(10)], [60, Math.log(50)]];
-  const SLOPE_END = Math.log(5) / 30;
-  function baseM(t) {
-    if (t >= 60) return Math.exp(CURVE[3][1] + (t - 60) * SLOPE_END);
-    for (let i = 1; i < CURVE.length; i++) {
-      if (t <= CURVE[i][0]) {
-        const a = CURVE[i - 1], b = CURVE[i];
-        return Math.exp(a[1] + (b[1] - a[1]) * (t - a[0]) / (b[0] - a[0]));
-      }
-    }
-    return 1;
-  }
-  function invBase(m) {
-    const l = Math.log(Math.max(1, m));
-    if (l >= CURVE[3][1]) return 60 + (l - CURVE[3][1]) / SLOPE_END;
-    for (let i = 1; i < CURVE.length; i++) {
-      if (l <= CURVE[i][1]) { const a = CURVE[i - 1], b = CURVE[i]; return a[0] + (l - a[1]) / (b[1] - a[1]) * (b[0] - a[0]); }
-    }
-    return 0;
-  }
-  function curM() { return Math.min(9999, baseM(R.t) * R.factor); }
+  // 時間で少しずつ(30秒で約×2.5)。フィーバー中は2.5倍の速さ。スロットの当たりは factor に掛け算
+  const GROW = 0.03;
+  function curM() { return Math.min(9999, Math.exp(R.lm) * R.factor); }
+  // あと何秒でその倍率に届くか(フィーバーなしで)
+  function secsTo(m) { return (Math.log(m / R.factor) - R.lm) / GROW; }
 
   // ---------- 状態 ----------
   let mode = 'menu';         // menu / ready / play / outro / dying
@@ -126,7 +115,10 @@
   let lastPtr = { x: W / 2, y: 470 };
   const ptrs = new Set();
   let selStage = 1, nextHint = false, held = 0, D = null;
-  const fx = { parts: [], pops: [], ripples: [], shake: 0, flash: 0, flashRed: false };
+  const fx = { parts: [], pops: [], ripples: [], shards: [], shake: 0, flash: 0, flashRed: false };
+  // スロットの見た目(リールの回り方)。勝負の外でもゆっくり回っている
+  const reels = [0, 1, 2].map(i => ({ spin: true, sym: 'seven', off: i * 4.3, v: 2.5, stopC: 0 }));
+  const slotVis = { reachIdx: -1, reachT0: 0, reachDur: 1, lights: 'idle', line: false };
 
   // ---------- 画面の大きさ合わせ ----------
   function fit() {
@@ -161,12 +153,14 @@
     const cfg = kind === 'stage' ? STAGES[stage - 1] : dailyCfg();
     // デイリーと練習は日付から作るので、全員同じ配置になる
     const seed = kind === 'stage' ? (crand() * 4294967296) >>> 0 : todaySeed();
-    const rp = Ink.rng(seed + 11), rs = Ink.rng(seed + 22), rc = Ink.rng(seed + 33);
+    const rp = Ink.rng(seed + 11), rs = Ink.rng(seed + 22);
     R = {
       kind, stage, cfg, bet, rp, rs,
       t: 0, factor: 1, ms: 0, tk: -1, lastTick: 0, uid: 0, freeze: 0,
       tempters: [], pending: [], reals: [], neonT: -9, nextSpawn: 2.4,
-      crack: null, crackAt: 0, nextBeep: 0, sil: null,
+      lm: 0, fever: 0, cracks: 0, crackFx: [], reachM: 0, sil: null,
+      rc: Ink.rng(seed + 33), slot: { phase: 'spin', nextAt: 2.6, idx: 0, res: [], stopAt: 0, reach: null, spins: 0, skullReach: false, showUntil: 0, win: false },
+      stats: { wins: 0, jack: 0, safes: 0 },
       realGot: 0, missed: null, hitTarget: false, swipe: null, paused: false,
       hint: nextHint || (kind === 'stage' && stage === 1 && S.cleared === 0),
       res: null, revived: false, readyT: 0, readyPh: 0, dieT: 0, outT: 0, shown: false,
@@ -183,10 +177,8 @@
       R.reals.push({ pre: tt, app: tt + 0.45, preDone: false, appDone: false });
       tt += 7 + rp() * 10;
     }
-    // ヒビの時刻(時間がたつほど来やすい)
-    let ca = 5 + Math.sqrt(-2 * Math.log(1 - rc()) / cfg.haz);
-    if (R.sil && ca > R.sil.at - 0.5 && ca < R.sil.at + R.sil.dur + 0.8) ca = R.sil.at + R.sil.dur + 0.8;
-    R.crackAt = ca;
+    reels.forEach(r => { r.spin = true; r.v = 14; });
+    Object.assign(slotVis, { reachIdx: -1, line: false });
   }
 
   async function start(kind, stage, bet) {
@@ -265,9 +257,14 @@
     else if (type === 'notify') { tp.x = (W - tp.w) / 2; tp.y = 44 + rs() * 50; tp.who = WHO[Math.floor(rs() * WHO.length)]; }
     else if (type === 'resume') { tp.x = (W - tp.w) / 2; tp.y = 300; }
     else {
-      // 大きい誘惑は倍率の表示(窓の上のほう)をなるべくふさがない
-      const y0 = tp.w >= 180 && type !== 'hype' ? 226 : 46;
-      tp.x = 10 + rs() * (W - 20 - tp.w); tp.y = y0 + rs() * (LANE_Y - 10 - y0 - tp.h);
+      // 倍率の表示とスロットは、なるべくふさがない(何回か場所を選び直す)
+      const S2 = Ink.SLOT, y0 = tp.w >= 180 && type !== 'hype' ? 226 : 46;
+      for (let k = 0; k < 8; k++) {
+        tp.x = 10 + rs() * (W - 20 - tp.w); tp.y = y0 + rs() * (LANE_Y - 10 - y0 - tp.h);
+        const ox = Math.max(0, Math.min(tp.x + tp.w, S2.x + S2.w) - Math.max(tp.x, S2.x));
+        const oy = Math.max(0, Math.min(tp.y + tp.h, S2.y + S2.h) - Math.max(tp.y, S2.y));
+        if (ox * oy < tp.w * tp.h * 0.2) break;
+      }
     }
     if (o.lane) tp.y = Math.min(H - tp.h * 0.6, LANE_Y - tp.h * 0.35 + rs() * 12);
     if (!tp.real && T.se) Sound.se(T.se);
@@ -281,11 +278,11 @@
   }
   function tip(text, dur) { if (R && R.tut) R.tip = { lines: text.split(/(?<=。)/), until: R.t + dur }; }
 
-  function makeRays(cx, cy) {
-    const rays = [], n = 9 + Math.floor(Math.random() * 4);
+  function makeRays(cx, cy, len) {
+    const rays = [], n = 7 + Math.floor(Math.random() * 4);
     for (let i = 0; i < n; i++) {
       let a = i / n * Math.PI * 2 + Math.random() * 0.5, x = cx, y = cy;
-      const pts = [[x, y]], steps = Math.round((140 + Math.random() * 320) / 18);
+      const pts = [[x, y]], steps = Math.round(len * (0.4 + Math.random() * 0.6) / 18);
       for (let k = 0; k < steps; k++) {
         a += (Math.random() - 0.5) * 0.5; x += Math.cos(a) * 18; y += Math.sin(a) * 18;
         pts.push([x, y]);
@@ -300,22 +297,115 @@
     }
     return rays;
   }
-  function startCrack() {
-    const x = 60 + Math.random() * 240, y = 120 + Math.random() * 300;
-    R.crack = { t0: R.t, x, y, rays: makeRays(x, y), seed: (Math.random() * 1e9) | 0 };
-    R.nextBeep = R.t + 0.3;
-    Sound.se('crack'); shake(10); flash(0.5); vib([60, 30, 60]);
-    popup('ヒビ!', W / 2, 262, 40, true);
-    tip('ヒビ! 急いで下の帯を上にスワイプ!', R.cfg.grace);
+  // ---------- 運命スロット ----------
+  function skullP(t) { return Math.min(0.34, R.cfg.s0 * (1 + t / 30)); }
+  function pickSym(t, excl) {
+    const s0 = skullP(t), names = SYMS.concat(['skull']);
+    const ws = SYM_W.map(w => w * (1 - s0)).concat([s0]).map((w, i) => (excl && excl.includes(names[i]) ? 0 : w));
+    let x = R.rc() * ws.reduce((a, b) => a + b, 0);
+    for (let i = 0; i < names.length; i++) { x -= ws[i]; if (x <= 0) return names[i]; }
+    return 'blank';
+  }
+  function rollReel(i, t) {
+    const q = R.slot;
+    if (R.tut && q.spins === 1) return 'cherry';      // ステージ1の最初の回転は必ずそろう(当たりの気持ちよさを先に知ってもらう)
+    if (i === 2 && q.res[0] === 'seven' && q.res[1] === 'seven') return R.rc() < 0.3 ? 'seven' : pickSym(t, ['seven']);
+    return pickSym(t);
+  }
+  function updateSlot(t, silent) {
+    const q = R.slot;
+    if (q.phase === 'spin') {
+      if (t >= q.nextAt && !silent) {
+        Object.assign(q, { phase: 'stop', idx: 0, res: [], skullReach: false, win: false });
+        q.spins++;
+        if (q.spins === 1) tip('下のスロットが勝手に回る。そろうと倍率アップ', 3.5);
+        planStop(t);
+      }
+      return;
+    }
+    if (q.phase === 'stop') {
+      const rq = q.reach;
+      if (rq && t >= rq.nextBeep) { Sound.se('reach', rq.k++); rq.nextBeep = t + Math.max(0.13, 0.32 - rq.k * 0.015); }
+      if (t < q.stopAt) return;
+      const i = q.idx, sym = rollReel(i, t);
+      q.res.push(sym);
+      Object.assign(reels[i], { spin: false, sym, stopC: clock });
+      Sound.se('reel');
+      q.reach = null; slotVis.reachIdx = -1;
+      if (sym === 'skull') { addCrack(); if (R.cracks >= 3) { lose('bust'); return; } }
+      q.idx++;
+      if (q.idx >= 3) { evalSpin(t); q.phase = 'show'; q.showUntil = t + 1.1; }
+      else planStop(t);
+      return;
+    }
+    if (q.phase === 'show' && t >= q.showUntil) {
+      q.phase = 'spin'; q.nextAt = t + 1.0 + R.rc() * 0.8; q.win = false;
+      slotVis.line = false;
+      reels.forEach(r => { r.spin = true; r.v = 14; });
+      Sound.se('spin');
+    }
+  }
+  // 次のリールがいつ止まるか。あと1つドクロで全損ならリーチ(ゆっくり)、7が2つなら777チャンス
+  function planStop(t) {
+    const q = R.slot, i = q.idx;
+    const seven = i === 2 && q.res[0] === 'seven' && q.res[1] === 'seven';
+    if (R.cracks === 2) {
+      const dur = R.cfg.grace * (q.skullReach ? 0.6 : 1);
+      if (!q.skullReach) startReach();
+      q.skullReach = true;
+      q.reach = { type: 'skull', t0: t, dur, k: 0, nextBeep: t };
+      q.stopAt = t + dur;
+    } else if (seven) {
+      q.reach = { type: 'seven', t0: t, dur: 1.7, k: 0, nextBeep: t };
+      q.stopAt = t + 1.7;
+      popup('777 チャンス!', W / 2, 300, 30); vib([20, 20, 20]);
+    } else { q.reach = null; q.stopAt = t + (i === 0 ? 0.45 : 0.32); return; }
+    Object.assign(slotVis, { reachIdx: i, reachT0: clock, reachDur: q.reach.dur });
+  }
+  function startReach() {
+    R.reachM = curM();
+    popup('リーチ!', W / 2, 300, 40, true); shake(6); vib([30, 30, 30, 30]);
+    tip('リーチ! 次にドクロが出たら全損。受け取るなら今', R.cfg.grace);
     // 山場:受け取ろうとする指の先(下の帯)に偽物を置く
     if (R.kind !== 'stage' || R.stage >= 2) addTempter('bonus', { lane: true });
-    if (R.kind !== 'stage' || R.stage >= 3) addTempter('hype', { lane: true });
+    if (R.kind !== 'stage' || R.stage >= 4) addTempter('hype', { lane: true });
+  }
+  function evalSpin(t) {
+    const q = R.slot, a = q.res[0], b = q.res[1], c = q.res[2];
+    const cx = W / 2, cy = 383;
+    if (a === b && b === c && PAYS[a]) {
+      R.factor *= PAYS[a]; R.fever = Math.max(R.fever, t) + 5; R.stats.wins++; q.win = true;
+      slotVis.line = true;
+      const big = a === 'seven';
+      if (big) { R.stats.jack++; Sound.se('jackpot'); flash(0.8); shake(14); vib([40, 30, 40, 30, 120]); coinBurst(cx, cy, 40); R.freeze = 0.3; }
+      else { Sound.se('win3', SYMS.indexOf(a)); flash(0.4); shake(7); vib([20, 30, 60]); coinBurst(cx, cy, 16); R.freeze = 0.12; }
+      popup((big ? '大当り!! ' : SYM_NAME[a] + 'そろい ') + '×' + PAYS[a], cx, 300, big ? 36 : 28, big);
+      popup('FEVER!', cx, 470, 26);
+      tip(SYM_NAME[a] + 'が3つ! 倍率×' + PAYS[a] + '。フィーバー中は倍率が速く上がる', 4);
+    } else if (a === b && PAYS[a]) {
+      R.factor *= 1.1; Sound.se('small'); popup('おしい! +10%', cx, 300, 20);
+    }
+    if (q.skullReach && R.cracks < 3) {
+      R.factor *= 1.2; R.stats.safes++; Sound.se('safe'); flash(0.3); vib([20, 40, 20]);
+      popup('セーフ!! ×1.2', cx, 470, 30);
+    }
+  }
+  function addCrack() {
+    R.cracks++;
+    const x = 50 + Math.random() * 260, y = 90 + Math.random() * 330;
+    R.crackFx.push({ t0: R.t, x, y, rays: makeRays(x, y, 120 + R.cracks * 90), seed: (Math.random() * 1e9) | 0 });
+    Sound.se('crack'); shake(9); flash(0.35, true); vib([50, 30, 50]);
+    if (R.cracks < 3) {
+      popup('ヒビ ' + R.cracks + '/3', W / 2, 470, 28, true);
+      tip(R.cracks === 1 ? 'ドクロ=ヒビ1本。3本で全損' : 'ヒビ2本! 次のドクロで全損。受け取るなら今', 4);
+    }
   }
 
   // ---------- 毎フレームの進行 ----------
   function update(dt) {
     clock += dt;
     updateFx(dt);
+    updateGift(dt);
     if (!R) return;
     if (mode === 'ready') {
       R.readyT += dt;
@@ -339,10 +429,11 @@
   function updatePlay(dt) {
     if (R.freeze > 0) { R.freeze -= dt; return; }   // ヒットストップ(一瞬止まる)
     R.t += dt;
+    R.lm += GROW * dt * (R.fever > R.t ? 2.5 : 1);
     const t = R.t, cfg = R.cfg, sl = R.sil;
 
     // 静寂:全部止まって白くなる。「タップして再開」は罠
-    if (sl && !sl.on && !sl.done && t >= sl.at) {
+    if (sl && !sl.on && !sl.done && t >= sl.at && R.slot.phase !== 'stop') {
       sl.on = true; R.tempters = []; R.pending = []; Sound.duck(true);
     }
     if (sl && sl.on) {
@@ -370,7 +461,7 @@
 
     if (!silent && t >= R.nextSpawn) {
       if (R.tempters.filter(tp => !tp.real).length < maxActive(t)) spawnRandom();
-      R.nextSpawn = t + gap(t) * (R.crack ? 0.6 : 1);
+      R.nextSpawn = t + gap(t) * (R.slot.reach ? 0.6 : 1);
     }
 
     for (const tp of R.tempters) if (tp.type === 'coin') tp.y = tp.y0 + (t - tp.t0) * tp.vy;
@@ -379,13 +470,8 @@
       return true;
     });
 
-    // ヒビ
-    if (!R.crack && !silent && t >= R.crackAt) startCrack();
-    if (R.crack) {
-      const left = cfg.grace - (t - R.crack.t0);
-      if (t >= R.nextBeep) { Sound.se('beep'); R.nextBeep = t + (left < 1 ? 0.16 : 0.4); }
-      if (left <= 0) { lose('collapse'); return; }
-    }
+    updateSlot(t, silent);
+    if (mode !== 'play') return;
 
     // 節目の演出と、数字が上がるカチカチ音
     const m = curM();
@@ -394,17 +480,17 @@
     const k = Math.floor(m / step);
     if (k !== R.tk) { R.tk = k; if (!silent && clock - R.lastTick > 0.05) { R.lastTick = clock; Sound.se('tick', m); } }
     if (R.kind === 'stage' && !R.hitTarget && m >= cfg.target) {
-      R.hitTarget = true; popup('目標達成', W / 2, 300, 22); Sound.se('win');
+      R.hitTarget = true; popup('目標達成', W / 2, 228, 22); Sound.se('win');
       tip('目標達成! もう受け取ってクリアできる。まだ待ってもいい', 5);
     }
-    Sound.intensity(Math.log(m) / Math.log(60));
+    Sound.intensity(Math.max(R.cracks / 3, Math.log(m) / Math.log(20), R.slot.reach ? 0.9 : 0));
   }
 
   function milestone(v, i) {
     R.freeze = Math.max(R.freeze, 0.06 + Math.min(0.08, i * 0.012));
     shake(3 + i); flash(0.12 + i * 0.02); vib(20 + i * 5);
     Sound.se('milestone', i);
-    popup('×' + v + '!', W / 2, 262, 30 + i * 2);
+    popup('×' + v + '!', W / 2, 250, 26 + i * 2);
   }
   function gotReal(tp) {
     tp.got = true;
@@ -421,14 +507,25 @@
     const m = curM();
     R.res = { win: true, m, pay: Math.floor(R.bet * m), t: R.t };
     mode = 'outro'; R.outT = 0; R.tk = -1; R.swipe = null;
+    const tier = winTier(m);
     Sound.duck(false); Sound.music('off'); Sound.se('cashout');
-    coinRain(46); flash(0.6); shake(6); vib([15, 30, 15, 30, 80]);
+    if (tier >= 2) setTimeout(() => Sound.se('jackpot'), 250);
+    else if (tier === 1) setTimeout(() => Sound.se('win3', 3), 250);
+    coinRain(40 + tier * 40); flash(0.6); shake(6 + tier * 3); vib([15, 30, 15, 30, 80]);
+    slotVis.reachIdx = -1;
   }
   function lose(reason, tp) {
     R.res = { win: false, reason, tp: tp || null, m: curM(), t: R.t };
-    mode = 'dying'; R.dieT = 0; R.swipe = null;
-    Sound.duck(false); Sound.music('off'); Sound.se('lose');
-    flash(0.7, true); shake(12); vib([80, 40, 160]);
+    mode = 'dying'; R.dieT = 0; R.swipe = null; slotVis.reachIdx = -1;
+    Sound.duck(false); Sound.music('off'); Sound.se(reason === 'bust' ? 'bust' : 'lose');
+    flash(0.7, true); shake(reason === 'bust' ? 18 : 12); vib([80, 40, 160]);
+    if (reason === 'bust') {
+      // ガラスが割れて飛び散る
+      for (let i = 0; i < 40; i++) {
+        const a = Math.random() * Math.PI * 2, v = 80 + Math.random() * 380;
+        fx.shards.push({ x: W / 2 + (Math.random() - 0.5) * 200, y: 300 + (Math.random() - 0.5) * 300, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 100, rot: Math.random() * 6, vr: (Math.random() - 0.5) * 16, r: 6 + Math.random() * 16, life: 2 });
+      }
+    }
   }
 
   // ---------- 入力 ----------
@@ -500,6 +597,19 @@
     });
     fx.pops = fx.pops.filter(p => (p.t += dt) < p.dur);
     fx.ripples = fx.ripples.filter(r => (r.t += dt) < 0.3);
+    fx.shards = fx.shards.filter(p => {
+      p.vy += 600 * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.rot += p.vr * dt; p.life -= dt;
+      return p.life > 0 && p.y < H + 30;
+    });
+    // スロットのリール:勝負中は速く、リーチ中のリールはだんだん遅く、勝負の外はゆっくり
+    const playing = R && (mode === 'play' || mode === 'ready');
+    reels.forEach((r, i) => {
+      if (!r.spin) return;
+      let v = playing || (gift && gift.phase === 'spin') ? 14 : 2.5;
+      if (slotVis.reachIdx === i) v = 14 - 11.5 * Math.min(1, (clock - slotVis.reachT0) / slotVis.reachDur);
+      if (R && R.paused) v = 0;
+      r.off += v * dt;
+    });
   }
 
   // ---------- 描画 ----------
@@ -512,10 +622,18 @@
     ctx.fillStyle = P.ink; ctx.fillRect(0, 0, cv.width, cv.height);
     if (bgs.length) ctx.drawImage(bgs[Math.floor(clock * 7) % 3], ox * K, oy * K);
     ctx.setTransform(K, 0, 0, K, ox * K, oy * K);
-    Ink.tv(ctx);
+    const fever = R && R.fever > R.t && (mode === 'play' || mode === 'outro');
+    const hot = !!(R && R.slot.reach && R.slot.reach.type === 'skull' && mode === 'play');
+    Ink.cityLife(ctx, clock, hot || fever);
+    Ink.tv(ctx, clock);
     Ink.towerLight(ctx, clock);
     const nl = R && mode !== 'menu' ? Math.max(0, 1 - (R.t - R.neonT) / 0.7) : 0;
-    Ink.neon(ctx, nl, clock);
+    Ink.neon(ctx, fever ? (Math.floor(clock * 8) % 2 ? 1 : 0.4) : nl, clock);
+    Ink.roomLife(ctx, clock, calm, hot);
+    if (fever && !calm) drawFever();
+    slotVis.lights = !R ? (gift ? gift.lights : 'idle') : mode === 'dying' ? 'dead' : hot ? 'reach'
+      : fever ? 'fever' : R.slot.win ? 'win' : mode === 'play' ? 'spin' : 'idle';
+    Ink.slot(ctx, { reels, lights: slotVis.lights, cracks: R ? R.cracks : 0, reachIdx: slotVis.reachIdx, line: slotVis.line }, clock);
     if (R) drawGame();
     drawFx();
     ctx.setTransform(K, 0, 0, K, 0, 0);
@@ -530,7 +648,8 @@
   function drawGame() {
     const P = Ink.P, silent = R.sil && R.sil.on;
     drawMeter();
-    if (R.crack) Ink.crack(ctx, R.crack, R.t - R.crack.t0);
+    for (const c of R.crackFx) Ink.crack(ctx, c, R.t - c.t0);
+    drawReach();
     for (const tp of R.tempters) {
       if (tp.type === 'resume') continue;
       Ink.tempter(ctx, tp, R.t - tp.t0, clock, S.set.calm);
@@ -570,7 +689,7 @@
   }
 
   function drawLane() {
-    const P = Ink.P, y = LANE_Y, hot = R.crack && mode === 'play';
+    const P = Ink.P, y = LANE_Y, rq = R.slot.reach, hot = rq && rq.type === 'skull' && mode === 'play';
     const blink = hot && !S.set.calm && Math.floor(clock * 8) % 2 === 0;
     ctx.globalAlpha = 0.9; ctx.fillStyle = blink ? P.red : P.ink; ctx.fillRect(0, y, W, H - y); ctx.globalAlpha = 1;
     Ink.seed(3 + Math.floor(clock * 7), 0.8);
@@ -585,9 +704,9 @@
     ctx.globalAlpha = 1;
     Ink.txt(ctx, hot ? '今すぐ ↑ 上にスワイプ!' : '↑ ここを上にスワイプで受け取る', W / 2, y + 28, hot ? 18 : 14, { h: true, c: P.glow });
     if (hot) {
-      const left = Math.max(0, R.cfg.grace - (R.t - R.crack.t0)), cx = W - 40, cy = y - 36;
+      const left = Math.max(0, rq.dur - (R.t - rq.t0)), cx = W - 40, cy = y - 36;
       ctx.beginPath(); ctx.arc(cx, cy, 22, 0, 7); ctx.fillStyle = P.ink; ctx.fill();
-      ctx.beginPath(); ctx.arc(cx, cy, 22, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * left / R.cfg.grace);
+      ctx.beginPath(); ctx.arc(cx, cy, 22, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * left / rq.dur);
       ctx.lineWidth = 4; ctx.strokeStyle = P.red; ctx.stroke();
       Ink.txt(ctx, left.toFixed(1), cx, cy + 1, 14, { c: P.glow });
     }
@@ -597,7 +716,9 @@
     const P = Ink.P;
     ctx.globalAlpha = 0.85; ctx.fillStyle = P.ink; ctx.fillRect(0, 0, W, 34); ctx.globalAlpha = 1;
     Ink.txt(ctx, '手持ち ' + fmt(S.coins), 10, 18, 12, { h: true, c: P.glow, al: 'left' });
-    Ink.txt(ctx, R.kind === 'stage' ? 'STAGE ' + R.stage : (R.kind === 'daily' ? '今日の一発' : '練習'), W / 2, 18, 13, { c: P.glow });
+    const fv = R.fever > R.t;
+    if (fv && Math.floor(clock * 6) % 2) { ctx.fillStyle = P.red; ctx.fillRect(W / 2 - 50, 4, 100, 26); }
+    Ink.txt(ctx, fv ? 'FEVER ' + (R.fever - R.t).toFixed(1) : R.kind === 'stage' ? 'STAGE ' + R.stage : (R.kind === 'daily' ? '今日の一発' : '練習'), W / 2, 18, 13, { c: P.glow });
     Ink.txt(ctx, 'BET ' + fmt(R.bet), W - 10, 18, 12, { h: true, c: P.glow, al: 'right' });
   }
 
@@ -641,26 +762,73 @@
       const cx = tp.x + tp.w / 2, cy = tp.y + tp.h / 2, r = Math.max(tp.w, tp.h) * 0.62 + 10;
       ctx.beginPath(); ctx.arc(cx, cy, r, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.min(1, R.dieT / 0.4));
       ctx.lineWidth = 4; ctx.strokeStyle = P.red; ctx.stroke();
-    } else if (R.crack) Ink.crack(ctx, R.crack, 1);
+    } else {
+      // ヒビが全部つながって割れる
+      for (const c of R.crackFx) Ink.crack(ctx, c, 1);
+      Ink.symbol(ctx, 'skull', W / 2, 250, 2.6 + Math.min(1, R.dieT * 3) * 0.6);
+    }
     if (R.dieT > 0.35) {
       const s = 1 + Math.max(0, 1 - (R.dieT - 0.35) / 0.12) * 1.3;
       ctx.save(); ctx.translate(W / 2, 330); ctx.rotate(-0.12); ctx.scale(s, s);
-      Ink.txt(ctx, R.res.reason === 'collapse' ? '崩れた' : '全損', 0, 0, 78, { c: P.red, sw: 8, sc: P.ink });
+      Ink.txt(ctx, '全損', 0, 0, 78, { c: P.red, sw: 8, sc: P.ink });
       ctx.restore();
     }
   }
 
+  function winTier(m) { return m >= 10 ? 3 : m >= 5 ? 2 : m >= 3 ? 1 : 0; }
+  const TIER_NAME = ['', 'BIG WIN', 'MEGA WIN', '超大当り'];
   function drawOutro() {
-    const P = Ink.P, k = Math.min(1, R.outT / 0.8);
+    const P = Ink.P, k = Math.min(1, R.outT / 0.8), tier = winTier(R.res.m);
     const s = 1 + Math.max(0, 1 - R.outT / 0.12) * 1.2;
+    if (tier) {
+      // 大勝ちは後ろで光がぐるぐる回る
+      ctx.save(); ctx.translate(W / 2, 320); ctx.rotate(clock * 0.8);
+      ctx.globalAlpha = 0.18; ctx.fillStyle = P.glow;
+      for (let i = 0; i < 12; i++) { ctx.rotate(Math.PI / 6); ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(-30, -420); ctx.lineTo(30, -420); ctx.closePath(); ctx.fill(); }
+      ctx.restore();
+      const ts = 1 + Math.max(0, 1 - (R.outT - 0.2) / 0.12) * 1.5;
+      if (R.outT > 0.2) {
+        ctx.save(); ctx.translate(W / 2, 262); ctx.rotate(0.04); ctx.scale(ts, ts);
+        Ink.txt(ctx, TIER_NAME[tier], 0, 0, 30 + tier * 6, { c: tier === 3 ? P.red : P.glow, sw: 7, sc: P.ink });
+        ctx.restore();
+      }
+    }
     ctx.save(); ctx.translate(W / 2, 330); ctx.rotate(-0.05); ctx.scale(s, s);
     Ink.txt(ctx, 'ゲット!', 0, 0, 64, { c: P.glow, sw: 9 });
     ctx.restore();
     Ink.txt(ctx, '+' + fmt(R.res.pay * k) + ' 枚', W / 2, 392, 28, { c: P.glow, sw: 6 });
   }
 
+  // リーチ中の大きな文字
+  function drawReach() {
+    const P = Ink.P, rq = R.slot.reach;
+    if (!rq || mode !== 'play') return;
+    const pulse = 1 + Math.sin(clock * 16) * 0.06;
+    ctx.save(); ctx.translate(W / 2, 300); ctx.scale(pulse, pulse);
+    if (rq.type === 'skull') Ink.txt(ctx, 'リーチ!', 0, 0, 34, { c: P.red, sw: 6, sc: P.ink });
+    else Ink.txt(ctx, '777 チャンス!', 0, 0, 28, { c: P.glow, sw: 6, sc: P.ink });
+    ctx.restore();
+    if (rq.type === 'skull') Ink.txt(ctx, 'ドクロが出たら全損! 受け取るなら今', W / 2, 458, 13, { h: true, c: P.glow, sw: 4, sc: P.red });
+  }
+  // フィーバー:スロットの後ろから光が回り、部屋がちかちかする
+  function drawFever() {
+    const P = Ink.P;
+    ctx.save(); ctx.translate(W / 2, 383); ctx.rotate(clock * 1.5);
+    ctx.globalAlpha = 0.1; ctx.fillStyle = P.glow;
+    for (let i = 0; i < 10; i++) { ctx.rotate(Math.PI / 5); ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(-24, -460); ctx.lineTo(24, -460); ctx.closePath(); ctx.fill(); }
+    ctx.restore();
+    if (Math.floor(clock * 8) % 2) { ctx.globalAlpha = 0.06; ctx.fillStyle = P.glow; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1; }
+  }
+
   function drawFx() {
     const P = Ink.P;
+    for (const p of fx.shards) {
+      ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot);
+      ctx.beginPath(); ctx.moveTo(0, -p.r); ctx.lineTo(p.r * 0.6, p.r * 0.5); ctx.lineTo(-p.r * 0.5, p.r * 0.3); ctx.closePath();
+      ctx.globalAlpha = 0.5; ctx.fillStyle = P.glow; ctx.fill();
+      ctx.globalAlpha = 1; ctx.lineWidth = 1.6; ctx.strokeStyle = P.ink; ctx.stroke();
+      ctx.restore();
+    }
     for (const p of fx.parts) {
       ctx.save(); ctx.translate(p.x, p.y); ctx.scale(Math.max(0.2, Math.abs(Math.cos(p.rot))), 1);
       ctx.beginPath(); ctx.arc(0, 0, 7, 0, 7); ctx.fillStyle = P.glow; ctx.fill();
@@ -710,6 +878,9 @@
   const RANKS = ['見習い', '見習い', '駆け出し', '駆け出し', '常連', '常連', '勝負師', '勝負師', '鉄の指', '鉄の指', '伝説'];
   function goHome() {
     mode = 'menu'; R = null; D = null; held = 0;
+    if (gift && gift.phase !== 'spin') gift = null;
+    slotVis.line = false; slotVis.reachIdx = -1;
+    reels.forEach(x => { x.spin = true; });
     renderHome();
     show('scr-home');
     Sound.music('menu');
@@ -729,12 +900,57 @@
     $('h-prog').style.width = (S.cleared * 10) + '%';
     $('h-daily-s').textContent = d.played ? (d.best ? '×' + fmtM(d.best) + '(済)' : '挑戦済み') : '未挑戦';
   }
-  function claimBonus() {
+  // ---------- 今日の配給スロット(1日1回。部屋のスロットを回す) ----------
+  let gift = null;
+  function openGift() {
     if (S.bonusDate === today()) return;
-    S.bonusDate = today(); S.coins += 300; save();
-    Sound.se('cashout'); coinRain(30); vib([15, 30, 15]);
-    toast('今日の配給 +300枚');
-    renderHome();
+    gift = { phase: 'idle', lights: 'idle', res: [], stops: [], t: 0, prize: 0 };
+    $('g-msg').textContent = 'そろうほど多くもらえる';
+    $('g-spin').textContent = '回す';
+    show('scr-gift');
+  }
+  function spinGift() {
+    if (!gift) return;
+    if (gift.phase === 'done') { gift = null; goHome(); return; }
+    if (gift.phase !== 'idle') return;
+    // 先に結果を決める(当たりやすさ:777 3% / 3つそろい 12% / 2つそろい 35%)
+    const r = crand(), pick = l => l[Math.floor(crand() * l.length)];
+    const pool = ['cherry', 'bell', 'bar', 'blank'];
+    let res, prize;
+    if (r < 0.03) { res = ['seven', 'seven', 'seven']; prize = 3000; }
+    else if (r < 0.15) { const a = pick(['cherry', 'bell', 'bar']); res = [a, a, a]; prize = 1000; }
+    else if (r < 0.5) { const a = pick(pool.concat(['seven'])); res = [a, a, pick(pool.concat(['seven']).filter(x => x !== a))]; prize = 500; }
+    else { const a = pick(pool); res = [a, pick(pool.concat(['seven']).filter(x => x !== a)), pick(pool)]; prize = 200; }
+    S.bonusDate = today(); S.coins += prize; save();
+    const reach = res[0] === res[1];
+    Object.assign(gift, { phase: 'spin', res, prize, t: 0, stops: [0.9, 1.4, reach ? 3.2 : 1.9], idx: 0, lights: 'spin' });
+    reels.forEach(x => { x.spin = true; });
+    $('g-spin').textContent = '回転中…';
+    Sound.se('spin');
+  }
+  function updateGift(dt) {
+    const gf = gift;
+    if (!gf || gf.phase !== 'spin') return;
+    gf.t += dt;
+    if (gf.idx < 3 && gf.t >= gf.stops[gf.idx]) {
+      const i = gf.idx++;
+      Object.assign(reels[i], { spin: false, sym: gf.res[i], stopC: clock });
+      Sound.se('reel');
+      if (i === 1 && gf.res[0] === gf.res[1]) {
+        gf.lights = 'win'; popup(gf.res[0] === 'seven' ? '777 チャンス!' : 'リーチ!', W / 2, 300, 30);
+        Object.assign(slotVis, { reachIdx: 2, reachT0: clock, reachDur: gf.stops[2] - gf.t });
+      }
+      if (gf.idx === 3) {
+        gf.phase = 'done'; slotVis.reachIdx = -1;
+        const p = gf.prize, big = p >= 1000;
+        gf.lights = p >= 500 ? 'win' : 'idle'; slotVis.line = p >= 500;
+        Sound.se(p >= 3000 ? 'jackpot' : big ? 'win3' : p >= 500 ? 'small' : 'cashout', 2);
+        coinRain(p >= 3000 ? 120 : big ? 70 : 30); flash(big ? 0.6 : 0.3); shake(big ? 10 : 3); vib(big ? [30, 30, 90] : 20);
+        popup('+' + fmt(p) + '枚', W / 2, 300, big ? 40 : 30);
+        $('g-msg').textContent = (p >= 3000 ? '777!! ' : p >= 1000 ? '3つそろい! ' : p >= 500 ? '2つそろい! ' : '') + fmt(p) + '枚 もらった';
+        $('g-spin').textContent = 'ホームへ';
+      }
+    }
   }
   function goMenu() {
     mode = 'menu'; R = null; D = null; held = 0;
@@ -763,7 +979,7 @@
       g.appendChild(b);
     });
     const st = STAGES[selStage - 1];
-    $('m-stage').textContent = 'ステージ' + selStage + ':倍率が ×' + st.target + ' 以上のときに受け取ればクリア。ヒビが入ってから ' + st.grace.toFixed(1) + '秒 で全損。';
+    $('m-stage').textContent = 'ステージ' + selStage + ':倍率が ×' + st.target + ' 以上のときに受け取ればクリア。リーチの長さ ' + st.grace.toFixed(1) + '秒。';
     const bx = $('bets'); bx.innerHTML = '';
     [10, 50, 100, 500, 'ALL'].forEach(v => {
       const b = document.createElement('button'), all = v === 'ALL', amt = all ? S.coins : v;
@@ -797,7 +1013,7 @@
     cur.rules.filter(r => !prev.rules.includes(r)).forEach(r => items.push({ k: 'rule', name: RULES[r].name, desc: RULES[r].desc }));
     cur.types.filter(t => !prev.types.includes(t)).forEach(t => items.push({ k: 't', name: TEMPT[t].name, desc: TEMPT[t].desc }));
     if (cur.silence && !prev.silence) items.push({ k: 't', name: TEMPT.silence.name, desc: TEMPT.silence.desc });
-    if (cur.grace < prev.grace) items.push({ k: 'base', name: 'ヒビ', desc: 'ヒビが入ってから全損までが ' + cur.grace.toFixed(1) + '秒 に縮む。' });
+    if (cur.grace < prev.grace) items.push({ k: 'base', name: 'リーチ', desc: 'あと1本で全損の時の「リーチ」が ' + cur.grace.toFixed(1) + '秒 に縮む。ドクロも少し出やすくなる。' });
     if (!items.length) return null;
     return { head: stage === 1 ? 'ステージ1 に出てくるもの' : 'ステージ' + stage + ' で増えるもの', items };
   }
@@ -837,6 +1053,9 @@
     if (res.win) {
       $('r-head').textContent = 'ゲット!';
       note(res.t.toFixed(1) + '秒 耐えた');
+      if (R.stats.jack) note('777 大当り ×' + R.stats.jack + '!');
+      else if (R.stats.wins) note('スロットが ' + R.stats.wins + '回 そろった');
+      if (R.stats.safes) note('リーチを ' + R.stats.safes + '回 くぐり抜けた');
       if (R.realGot) note('本物を ' + R.realGot + ' 回見抜いた(×3)');
       if (R.missed != null) note(R.missed.toFixed(1) + '秒の本物を見逃した');
       pay.className = 'pay plus';
@@ -862,15 +1081,18 @@
         addBtn('もどる', 'btn', goDaily);
       }
     } else {
-      $('r-head').textContent = res.reason === 'collapse' ? '崩れた' : '全損';
+      $('r-head').textContent = '全損';
       if (res.reason === 'tap') {
         const tp = res.tp;
         if (tp.type === 'resume') note('静寂はワナ。待てば元に戻る', true);
         else if (tp.type === 'bonus') note('それはニセボーナス。本物は「チリン」が先で、絵は音なしで出る', true);
         else note('「' + TEMPT[tp.type].name + '」は誘惑。押したら全損', true);
-      } else note('ヒビが入ったら ' + cfg.grace.toFixed(1) + '秒以内に、下の帯を上にスワイプして受け取る', true);
+      } else {
+        note('ドクロが3つ目。ヒビ3本で全損', true);
+        if (R.reachM) note('リーチの時に受け取っていれば ' + fmt(R.bet * R.reachM) + '枚 だった');
+      }
       const nx = MS.find(v => v > res.m);
-      if (nx) { const need = invBase(nx / R.factor) - res.t; if (need > 0 && need < 30) note('あと ' + need.toFixed(1) + '秒 耐えれば ×' + nx + ' だった'); }
+      if (nx && res.reason === 'tap') { const need = secsTo(nx); if (need > 0 && need < 30) note('あと ' + need.toFixed(1) + '秒 耐えれば ×' + nx + ' だった'); }
       if (R.missed != null) note('本物は ' + R.missed.toFixed(1) + '秒に出ていた');
       pay.className = 'pay minus';
       if (k === 'stage') {
@@ -1071,7 +1293,8 @@
   $('warn-calm').onclick = () => { S.warned = true; S.set.calm = true; save(); goTitle(); };
   $('scr-title').onclick = () => { Sound.init(); Sound.se('click'); goHome(); };
   $('h-set').onclick = () => { renderSet(); show('scr-set'); };
-  $('h-bonus').onclick = claimBonus;
+  $('h-bonus').onclick = openGift;
+  $('g-spin').onclick = spinGift;
   $('h-go').onclick = () => { selStage = Math.min(10, S.cleared + 1); goMenu(); };
   $('h-daily').onclick = goDaily;
   $('h-how').onclick = () => openHowto(goHome);
@@ -1107,7 +1330,7 @@
 
   // ---------- 起動 ----------
   // キャンバスに書く文字のフォントを先に読みこむ(読めなくても代わりのフォントで動く)
-  const CANVAS_TEXT = '押すな。大当り穴今タップで×10!!0123456789.BONUS次へ▶電波が途切れたみたい…(このままだと記録が消えます)再接続に抜かれた見に行く★押して着信1回無料ゾロ目で止めろタップして再開秒耐えた枚目標クリアあとは欲との勝負手持ちSTAGE今日の一発練習BET受け取るゲット全損崩れたヒビREADY本物これが今すぐ↑ここを上にスワイプ……+達成ヒント何もしないで待つ倍率がどんどん上がる誘惑押すと全部なくなる!チリン♪このあと出るボーナスは押して!いつでも下の帯受け取れまだ待ってもいいヒビ!急いで' + WHO.join('');
+  const CANVAS_TEXT = '押すな。大当り穴今タップで×10!!0123456789.BONUS次へ▶電波が途切れたみたい…(このままだと記録が消えます)再接続に抜かれた見に行く★押して着信1回無料ゾロ目で止めろタップして再開秒耐えた枚目標クリアあとは欲との勝負手持ちSTAGE今日の一発練習BET受け取るゲット全損崩れたヒビREADY本物これが今すぐ↑ここを上にスワイプ……+達成ヒント何もしないで待つ倍率がどんどん上がる誘惑押すと全部なくなる!チリン♪このあと出るボーナスは押して!いつでも下の帯受け取れまだ待ってもいいヒビ!急いで運命スロットFEVERリーチ777チャンスドクロが出たら全損そろいチェリーベルBAR大当り!!おしい+10%セーフ!!×1.2/3BIG WINMEGA超大当り逃げ切り3つ下の勝手に回る倍率アップ' + WHO.join('');
   function loadFonts() {
     if (!document.fonts || !document.fonts.load) return Promise.resolve();
     const p = Promise.all([

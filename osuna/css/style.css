@@ -353,3 +353,11 @@ p { margin: 0; line-height: 1.6; font-size: 14px; }
 @media (prefers-reduced-motion: reduce) {
   .tapstart, .bonus { animation: none; }
 }
+
+/* ---------- 配給スロット ---------- */
+.gift-msg {
+  margin-bottom: 4px; min-height: 1.6em;
+  font-family: var(--f-disp); font-size: 20px; color: var(--glow);
+  text-shadow: 2px 2px 0 var(--ink), -1px -1px 0 var(--ink), 1px -1px 0 var(--ink), -1px 1px 0 var(--ink);
+  text-align: center;
+}

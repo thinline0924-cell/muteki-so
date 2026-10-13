@@ -131,6 +131,33 @@ const Sound = (function () {
       [110, 165, 220, 277, 330].forEach(f => tone(f, 1.0, { type: 'sawtooth', vol: 0.06, lp: 1600 }));
       noise(0.35, { ft: 'lowpass', f: 220, vol: 0.45 });
     },
+    // ---- 運命スロット ----
+    reel() { tone(180, 0.06, { type: 'square', vol: 0.08, lp: 900 }); noise(0.04, { f: 900, q: 2, vol: 0.12 }); },
+    spin() { const t = now(); for (let i = 0; i < 4; i++) tone(700 + i * 120, 0.04, { type: 'square', vol: 0.03, at: t + i * 0.04 }); },
+    reach(k) {   // リーチ中に何度も鳴らす(k が上がるほど高く速く)
+      const t = now(), f = 520 + (k || 0) * 60;
+      tone(f, 0.12, { type: 'square', vol: 0.06, at: t }); tone(f * 1.26, 0.12, { type: 'square', vol: 0.06, at: t + 0.12 });
+    },
+    small() { const t = now(); [880, 1175].forEach((f, i) => tone(f, 0.12, { type: 'square', vol: 0.05, at: t + i * 0.07 })); },
+    win3(i) {
+      const t = now(), base = [523, 587, 659, 784][i || 0];
+      [0, 4, 7, 12, 16].forEach((st, k) => tone(base * Math.pow(2, st / 12), 0.22, { type: 'square', vol: 0.06, at: t + k * 0.06 }));
+      tone(base / 2, 0.5, { type: 'triangle', vol: 0.15, at: t });
+    },
+    jackpot() {
+      const t = now();
+      [523, 659, 784, 1047, 784, 1047, 1319, 1568].forEach((f, k) => tone(f, 0.25, { type: 'square', vol: 0.07, at: t + k * 0.09 }));
+      [131, 165, 196].forEach(f => tone(f, 1.4, { type: 'sawtooth', vol: 0.05, lp: 1400, at: t + 0.7 }));
+      for (let k = 0; k < 24; k++) tone(1800 + Math.random() * 2000, 0.06, { type: 'square', vol: 0.025, at: t + 0.4 + k * 0.05 });
+      noise(1.2, { ft: 'highpass', f: 5000, vol: 0.07, at: t + 0.4 });
+    },
+    safe() { const t = now(); [784, 988, 1319].forEach((f, k) => tone(f, 0.3, { type: 'triangle', vol: 0.12, at: t + k * 0.08 })); },
+    bust() {
+      const t = now();
+      noise(0.9, { ft: 'highpass', f: 1800, vol: 0.45 }); noise(0.7, { ft: 'lowpass', f: 400, vol: 0.6, to: 60 });
+      tone(60, 1.0, { vol: 0.6, to: 24 });
+      for (let k = 0; k < 14; k++) tone(2500 + Math.random() * 4000, 0.1, { vol: 0.05, at: t + 0.05 + k * 0.035 });
+    },
     ready() { tone(660, 0.1, { type: 'square', vol: 0.06 }); },
     go() { tone(1320, 0.28, { type: 'square', vol: 0.07 }); }
   };

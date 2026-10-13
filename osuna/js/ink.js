@@ -86,19 +86,6 @@ const Ink = (function () {
     for (let i = 0; i < 30; i++) { const x = R() * W; line(g, x, 8 + R() * 30, x + 1, 436 - R() * 70, 1, P.shade); }
     g.globalAlpha = 1;
 
-    // 壁のポスター「大穴」とカレンダー
-    rect(g, 116, 340, 58, 80, P.paper, 2);
-    txt(g, '大', 145, 362, 22); txt(g, '穴', 145, 390, 22);
-    line(g, 124, 410, 166, 410, 1.2);
-    line(g, 145, 334, 145, 340, 1.2);
-    rect(g, 198, 344, 46, 56, P.paper, 1.6);
-    rect(g, 198, 344, 46, 12, P.shade, 1.6);
-    for (let r = 0; r < 4; r++) for (let c = 0; c < 5; c++) {
-      g.fillStyle = P.ink; g.globalAlpha = 0.55; g.fillRect(203 + c * 8, 362 + r * 9, 4, 3);
-    }
-    g.globalAlpha = 1;
-    ellipse(g, 227, 380, 6, 5, null, 1.4);
-
     // 窓(夜の街)
     rect(g, 34, 64, 292, 256, P.night, 2.6);
     g.save();
@@ -111,10 +98,8 @@ const Ink = (function () {
     line(g, 183, 64, 183, 320, 1.2);
     rect(g, 34, 64, 292, 256, null, 2.6);
 
-    // カーテン
+    // カーテンレール(カーテン本体は揺れるので毎フレーム描く:curtains)
     line(g, 8, 58, 352, 58, 3);
-    curtain(g, 12, 50, true);
-    curtain(g, 310, 348, false);
 
     // 床
     shape(g, [[-4, 440], [364, 440], [364, 644], [-4, 644]], P.mid, 0);
@@ -183,14 +168,15 @@ const Ink = (function () {
     g.globalAlpha = 1;
   }
 
-  function curtain(g, x0, x1, left) {
+  function curtain(g, x0, x1, left, sw) {
+    // sw = すそがゆれる量
     const pts = left
-      ? [[x0, 56], [x1, 56], [x1 + 4, 210], [x1 - 2, 334], [x0 - 2, 338], [x0 + 2, 200]]
-      : [[x0, 56], [x1, 56], [x1 - 2, 200], [x1 + 2, 338], [x0 + 2, 334], [x0 - 4, 210]];
+      ? [[x0, 56], [x1, 56], [x1 + 4 + sw * 0.5, 210], [x1 - 2 + sw, 334], [x0 - 2 + sw, 338], [x0 + 2 + sw * 0.4, 200]]
+      : [[x0, 56], [x1, 56], [x1 - 2 - sw * 0.4, 200], [x1 + 2 - sw, 338], [x0 + 2 - sw, 334], [x0 - 4 - sw * 0.5, 210]];
     shape(g, pts, P.paper, 2);
     for (let i = 1; i < 4; i++) {
       const x = x0 + (x1 - x0) * i / 4;
-      line(g, x, 60, x + (left ? 2 : -2), 330, 1.1, P.shade);
+      line(g, x, 60, x + (left ? sw + 2 : -sw - 2), 330, 1.1, P.shade);
     }
   }
 
@@ -267,17 +253,183 @@ const Ink = (function () {
     ['大', '当', 'り'].forEach((c, i) => txt(g, c, x + w / 2, y + 18 + i * 30, 17, { c: P.glow }));
     g.restore();
   }
-  // ブラウン管の砂嵐
-  function tv(g) {
+  // ブラウン管:競馬中継と砂嵐をくり返す
+  function tv(g, clock) {
     g.save();
     g.beginPath(); g.rect(21, 331, 48, 42); g.clip();
     g.fillStyle = P.night; g.fillRect(21, 331, 48, 42);
-    g.fillStyle = P.glow;
-    for (let i = 0; i < 70; i++) { g.globalAlpha = Math.random() * 0.6; g.fillRect(21 + Math.random() * 48, 331 + Math.random() * 42, 2 + Math.random() * 3, 1); }
+    const ph = clock % 10;
+    if (ph < 6.5) {
+      g.fillStyle = P.glow; g.globalAlpha = 0.5; g.fillRect(21, 362, 48, 1);
+      for (let i = 0; i < 3; i++) {
+        const hx = 76 - ((clock * (14 + i * 3) + i * 17) % 70), hy = 350 + i * 4, st = Math.floor(clock * 10 + i) % 2;
+        g.globalAlpha = 0.85;
+        g.beginPath(); g.ellipse(hx, hy, 6, 3, 0, 0, 7); g.fill();
+        g.beginPath(); g.ellipse(hx - 6, hy - 3, 2.6, 1.8, -0.5, 0, 7); g.fill();
+        g.fillRect(hx - 4 + st * 2, hy + 2, 1, 4); g.fillRect(hx + 3 - st * 2, hy + 2, 1, 4);
+      }
+      g.globalAlpha = 0.25; g.fillRect(21, 331 + (clock * 30) % 42, 48, 2);
+    } else {
+      g.fillStyle = P.glow;
+      for (let i = 0; i < 70; i++) { g.globalAlpha = Math.random() * 0.6; g.fillRect(21 + Math.random() * 48, 331 + Math.random() * 42, 2 + Math.random() * 3, 1); }
+    }
     g.restore();
   }
   function towerLight(g, clock) {
     if (Math.sin(clock * 3) > 0.2) { g.fillStyle = P.red; g.globalAlpha = 0.9; g.beginPath(); g.arc(286, 104, 2.2, 0, 7); g.fill(); g.globalAlpha = 1; }
+  }
+
+  // ---------- 動く背景 ----------
+  const LIFE = (function () {
+    const R = rng(77), wins = [], clouds = [];
+    for (let i = 0; i < 46; i++) wins.push({ x: 40 + R() * 280, y: 196 + R() * 88, ph: R() * 50, sp: 0.15 + R() * 0.6 });
+    for (let i = 0; i < 3; i++) clouds.push({ y: 78 + R() * 50, w: 50 + R() * 40, sp: 4 + R() * 6, ph: R() * 420 });
+    return { wins, clouds };
+  })();
+  // 窓の外:サーチライト・雲・飛行機・またたく窓明かり・電車・車
+  function cityLife(g, clock, hot) {
+    g.save();
+    g.beginPath(); g.rect(36, 66, 288, 224); g.clip();
+    g.fillStyle = P.glow;
+    for (let i = 0; i < 2; i++) {
+      const a = -Math.PI / 2 + Math.sin(clock * (0.25 + i * 0.13) + i * 2) * 0.7, bx = i ? 250 : 110, by = 300;
+      g.globalAlpha = hot ? 0.17 : 0.08;
+      g.beginPath(); g.moveTo(bx, by);
+      g.lineTo(bx + Math.cos(a - 0.06) * 330, by + Math.sin(a - 0.06) * 330);
+      g.lineTo(bx + Math.cos(a + 0.06) * 330, by + Math.sin(a + 0.06) * 330);
+      g.closePath(); g.fill();
+    }
+    g.globalAlpha = 0.16;
+    LIFE.clouds.forEach(c => {
+      const x = ((clock * c.sp + c.ph) % 420) - 60;
+      g.beginPath(); g.ellipse(x, c.y, c.w / 2, 7, 0, 0, 7); g.fill();
+      g.beginPath(); g.ellipse(x + c.w * 0.22, c.y - 5, c.w / 3, 6, 0, 0, 7); g.fill();
+    });
+    const ax = ((clock * 14) % 520) - 80;
+    if (Math.floor(clock * 2) % 2) { g.globalAlpha = 0.9; g.fillStyle = P.red; g.fillRect(ax, 98 + ax * 0.04, 2, 2); }
+    g.fillStyle = P.glow;
+    LIFE.wins.forEach(w => { const v = Math.sin(clock * w.sp + w.ph); if (v > 0.2) { g.globalAlpha = 0.2 + 0.55 * v; g.fillRect(w.x, w.y, 3, 4); } });
+    g.globalAlpha = 0.5;
+    g.fillRect(36, 271, 288, 1.4);
+    const tt = clock % 16;
+    if (tt < 4) {
+      const x = -260 + tt / 4 * 640;
+      g.globalAlpha = 1;
+      for (let c = 0; c < 4; c++) {
+        const cx = x + c * 62;
+        g.fillStyle = P.night; g.fillRect(cx, 254, 58, 16);
+        g.strokeStyle = P.glow; g.lineWidth = 1.2; g.strokeRect(cx, 254, 58, 16);
+        g.fillStyle = P.glow;
+        for (let k = 0; k < 5; k++) g.fillRect(cx + 5 + k * 11, 258, 6, 5);
+      }
+    }
+    for (let i = 0; i < 6; i++) {
+      const dir = i % 2 ? 1 : -1, sp = 26 + i * 9;
+      let x = (clock * sp + i * 97) % 380 - 10;
+      if (dir < 0) x = 360 - x;
+      g.globalAlpha = 0.9; g.fillStyle = dir > 0 ? P.glow : P.red;
+      g.fillRect(x, 286 - (i % 2) * 2, 3, 2); g.fillRect(x + 6 * dir, 286 - (i % 2) * 2, 3, 2);
+    }
+    g.restore();
+  }
+  // 部屋:カーテンのゆれ・光の中のほこり・灰皿の煙
+  function roomLife(g, clock, calm, hot) {
+    const sw = calm ? 0 : Math.sin(clock * 0.9) * 3 + Math.sin(clock * 2.3) * (hot ? 2.4 : 1);
+    seed(500 + Math.floor(clock * 7), 0.85);
+    curtain(g, 12, 50, true, sw);
+    curtain(g, 310, 348, false, sw);
+    g.fillStyle = P.glow;
+    for (let i = 0; i < 18; i++) {
+      const ph = i * 37.7;
+      const x = 246 + (Math.sin(clock * 0.3 + ph) * 30 + i * 6 + 40) % 110;
+      const y = 80 + (clock * (5 + i % 5) + ph * 13) % 460;
+      g.globalAlpha = 0.25 + 0.25 * Math.sin(clock * 2 + ph);
+      g.fillRect(x, y, 1.7, 1.7);
+    }
+    g.globalAlpha = 1;
+    ellipse(g, 300, 552, 13, 4, P.shade, 1.6);
+    line(g, 296, 549, 312, 545, 2.4, P.glow);
+    g.globalAlpha = 0.28; g.strokeStyle = P.glow; g.lineWidth = 2;
+    g.beginPath();
+    for (let k = 0; k < 24; k++) {
+      const yy = 543 - k * 6, xx = 313 + Math.sin(clock * 1.6 - k * 0.45) * (2 + k * 0.5);
+      if (k === 0) g.moveTo(xx, yy); else g.lineTo(xx, yy);
+    }
+    g.stroke();
+    g.globalAlpha = 1;
+  }
+
+  // ---------- 運命スロット ----------
+  const SLOT = { x: 92, y: 324, w: 176, h: 118 };
+  const STRIP = ['seven', 'cherry', 'bell', 'blank', 'bar', 'skull', 'cherry', 'bell', 'blank', 'bar', 'cherry', 'skull'];
+  function symbol(g, nm, cx, cy, s) {
+    g.save(); g.translate(cx, cy); g.scale(s, s);
+    if (nm === 'seven') txt(g, '7', 0, 2, 38, { c: P.red, sw: 4, sc: P.ink });
+    else if (nm === 'bar') { rect(g, -17, -10, 34, 20, P.ink, 0); txt(g, 'BAR', 0, 1, 11, { c: P.glow }); }
+    else if (nm === 'bell') {
+      shape(g, [[-4, -15], [4, -15], [11, -4], [14, 9], [-14, 9], [-11, -4]], P.mid, 2);
+      line(g, -15, 9, 15, 9, 2.5); ellipse(g, 0, 13, 3, 3, P.ink, 0);
+    } else if (nm === 'cherry') {
+      line(g, -6, 2, 2, -14, 1.6); line(g, 8, 4, 2, -14, 1.6);
+      ellipse(g, 7, -14, 6, 3, P.mid, 1.2);
+      ellipse(g, -6, 6, 7, 7, P.ink, 0); ellipse(g, 8, 8, 7, 7, P.ink, 0);
+      g.fillStyle = P.glow; g.fillRect(-9, 3, 2, 2); g.fillRect(5, 5, 2, 2);
+    } else if (nm === 'skull') {
+      ellipse(g, 0, -3, 14, 13, P.paper, 2.2, P.red);
+      ellipse(g, -5, -4, 4, 4, P.ink, 0); ellipse(g, 5, -4, 4, 4, P.ink, 0);
+      shape(g, [[0, 1], [-2, 5], [2, 5]], P.ink, 0);
+      rect(g, -7, 8, 14, 7, P.paper, 1.6, P.red);
+      line(g, -2, 8, -2, 15, 1); line(g, 2, 8, 2, 15, 1);
+    } else line(g, -8, 0, 8, 0, 2, P.shade);
+    g.restore();
+  }
+  // st = { reels: [{ spin, sym, off, stopC }], lights: idle/spin/reach/win/fever/dead, cracks, reachIdx, line }
+  function slot(g, st, clock) {
+    const { x, y, w, h } = SLOT;
+    seed(900 + Math.floor(clock * 7), 0.7);
+    rect(g, x, y, w, h, P.shade, 2.6);
+    rect(g, x + 8, y + 8, w - 16, h - 16, P.night, 1.4);
+    // 電球(ふだんは追いかけっこ、当たりで全部点滅、リーチで赤)
+    const bulbs = [];
+    for (let bx = x + 8; bx <= x + w - 8; bx += 14) { bulbs.push([bx, y + 4]); bulbs.push([bx, y + h - 4]); }
+    for (let by = y + 18; by <= y + h - 18; by += 14) { bulbs.push([x + 4, by]); bulbs.push([x + w - 4, by]); }
+    bulbs.forEach((b, i) => {
+      let on, col = P.glow;
+      if (st.lights === 'dead') on = false;
+      else if (st.lights === 'reach') { on = Math.floor(clock * 10) % 2 === 0; col = P.red; }
+      else if (st.lights === 'win' || st.lights === 'fever') on = Math.floor(clock * 14) % 2 === i % 2;
+      else on = (i + Math.floor(clock * (st.lights === 'spin' ? 9 : 4))) % 4 === 0;
+      g.beginPath(); g.arc(b[0], b[1], 2.6, 0, 7);
+      g.fillStyle = on ? col : P.mid; g.fill();
+    });
+    rect(g, x + 50, y + 10, 76, 13, P.ink, 0);
+    txt(g, '運命スロット', x + w / 2, y + 17, 9, { c: P.glow });
+    for (let i = 0; i < 3; i++) {
+      const rx = x + 22 + i * 46, ry = y + 27, rw = 40, rh = 56, r = st.reels[i], cx = rx + rw / 2, cy = ry + rh / 2;
+      rect(g, rx, ry, rw, rh, P.glow, 1.6);
+      g.save();
+      g.beginPath(); g.rect(rx + 1, ry + 1, rw - 2, rh - 2); g.clip();
+      if (r.spin) {
+        const base = Math.floor(r.off), fr = r.off - base, L = STRIP.length;
+        for (let k = -1; k <= 1; k++) symbol(g, STRIP[(((base - k) % L) + L) % L], cx, cy + (k + fr) * 46, 0.9);
+      } else {
+        const age = clock - r.stopC;
+        const b = age < 0.22 ? Math.sin(age / 0.22 * Math.PI) * 6 * (1 - age / 0.22) : 0;
+        symbol(g, r.sym, cx, cy + b, 1);
+      }
+      g.restore();
+      if (st.reachIdx === i) {
+        g.lineWidth = 3; g.strokeStyle = P.red; g.globalAlpha = 0.5 + 0.5 * Math.sin(clock * 18);
+        g.strokeRect(rx - 2, ry - 2, rw + 4, rh + 4); g.globalAlpha = 1;
+      }
+    }
+    if (st.line) { g.fillStyle = P.red; g.globalAlpha = 0.85; g.fillRect(x + 16, y + 54, w - 32, 2.5); g.globalAlpha = 1; }
+    txt(g, 'ヒビ', x + 34, y + h - 17, 10, { c: P.glow });
+    for (let k = 0; k < 3; k++) {
+      g.globalAlpha = k < st.cracks ? 1 : 0.25;
+      symbol(g, 'skull', x + 72 + k * 26, y + h - 17, 0.42);
+    }
+    g.globalAlpha = 1;
   }
 
   // ---------- 誘惑(押したら全損)と本物ボーナス ----------
@@ -467,6 +619,7 @@ const Ink = (function () {
   return {
     W, H, THEMES, FD, FH, rng, seed, trace, shape, rect, line, ellipse, txt, die,
     room, neon, tv, towerLight, tempter, crack, prepare, film,
+    cityLife, roomLife, slot, symbol, SLOT, STRIP,
     get P() { return P; },
     setTheme(k) { P = THEMES[k] || THEMES.sepia; }
   };
