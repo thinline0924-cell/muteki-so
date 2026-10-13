@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#2a2016">
+<title>押すな。</title>
+<meta name="description" content="待つほど倍率が上がる。画面の誘惑を押したら全損。本物のボーナスだけを見抜くチキンレース。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Yusei+Magic&display=swap">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="app">
+  <div id="stage">
+    <canvas id="cv"></canvas>
+    <div id="ui">
+
+      <!-- 点滅の注意(はじめて起動したとき) -->
+      <section id="scr-warn" class="scr center" hidden>
+        <div class="panel">
+          <h2>はじめに</h2>
+          <p>このゲームには、点滅・画面のゆれ・大きな音が出てきます。光の刺激で気分が悪くなったことがある人は「点滅をへらす」で始めてください(あとで設定から変えられます)。</p>
+          <p class="small">効果音が大事な手がかりになります。音を出して遊んでください。</p>
+          <div class="col">
+            <button id="warn-ok" class="btn big" type="button">音を出して始める</button>
+            <button id="warn-calm" class="btn" type="button">点滅をへらして始める</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- タイトル -->
+      <section id="scr-title" class="scr" hidden>
+        <div class="logo">
+          <span class="logo-main">押すな。</span>
+          <span class="logo-sub">DON'T TAP</span>
+        </div>
+        <p class="tagline">待つほど増える。押したら終わり。</p>
+        <div class="spacer"></div>
+        <div class="coinbar"><span>手持ち</span><b id="t-coins">0</b><span>枚</span></div>
+        <div class="col wide">
+          <button id="b-play" class="btn big" type="button">勝負する</button>
+          <button id="b-daily" class="btn" type="button">今日の一発 <small id="t-daily"></small></button>
+        </div>
+        <div class="row three wide">
+          <button id="b-rec" class="btn sm" type="button">記録</button>
+          <button id="b-shop" class="btn sm" type="button">店</button>
+          <button id="b-set" class="btn sm" type="button">設定</button>
+        </div>
+      </section>
+
+      <!-- ステージと賭け金 -->
+      <section id="scr-menu" class="scr" hidden>
+        <header class="bar">
+          <button class="back" data-go="title" type="button" aria-label="もどる">◀</button>
+          <h2>ステージ</h2>
+          <span class="coins"><b class="v-coins">0</b>枚</span>
+        </header>
+        <div class="panel tight">
+          <div id="stages" class="grid"></div>
+          <p id="m-stage" class="small"></p>
+        </div>
+        <div class="panel tight">
+          <div class="label">賭け金 BET</div>
+          <div id="bets" class="chips"></div>
+          <p id="m-info" class="small"></p>
+        </div>
+        <div class="spacer"></div>
+        <div class="col wide">
+          <button id="b-go" class="btn big" type="button">勝負する</button>
+          <button id="b-hint" class="btn sm" type="button">広告を見て、本物を1回だけ教えてもらう</button>
+        </div>
+      </section>
+
+      <!-- 新しいルールの説明 -->
+      <section id="scr-intro" class="scr center" hidden>
+        <div class="panel">
+          <h2 id="i-head"></h2>
+          <p id="i-note" class="small">赤い札は「本物の見分け方」</p>
+          <ul id="i-list" class="rules"></ul>
+          <button id="i-ok" class="btn big" type="button">わかった</button>
+        </div>
+      </section>
+
+      <!-- 結果 -->
+      <section id="scr-result" class="scr center" hidden>
+        <div class="panel result">
+          <div id="r-stamp" class="stamp" hidden></div>
+          <h2 id="r-head"></h2>
+          <div id="r-mult" class="bigmult"></div>
+          <div id="r-pay" class="pay"></div>
+          <ul id="r-notes" class="notes"></ul>
+          <div id="r-btns" class="col"></div>
+        </div>
+      </section>
+
+      <!-- 倍プッシュ(丁半) -->
+      <section id="scr-double" class="scr center" hidden>
+        <div class="panel">
+          <h2>倍プッシュ</h2>
+          <p class="small">丁(合計が偶数)か、半(奇数)か。当てれば倍、外せば0枚。3回まで。</p>
+          <div class="table">
+            <div class="dice"><div id="die1" class="die"></div><div id="die2" class="die"></div></div>
+            <div id="cup" class="cup"></div>
+          </div>
+          <p id="d-msg" class="dmsg">いま <b id="d-cur">0</b> 枚 → 当たれば <b id="d-next">0</b> 枚</p>
+          <div id="d-pick" class="row">
+            <button id="d-cho" class="btn big" type="button">丁</button>
+            <button id="d-han" class="btn big" type="button">半</button>
+          </div>
+          <button id="d-take" class="btn" type="button">降りて受け取る</button>
+        </div>
+      </section>
+
+      <!-- 今日の一発(デイリー) -->
+      <section id="scr-daily" class="scr" hidden>
+        <header class="bar">
+          <button class="back" data-go="title" type="button" aria-label="もどる">◀</button>
+          <h2>今日の一発</h2>
+          <span class="coins" id="dy-date"></span>
+        </header>
+        <div class="panel">
+          <p class="small">全員が同じ配置で、1日1回だけ挑戦できます。賭け金はいりません(100枚ぶんで計算)。</p>
+          <div class="label">今日だけの見分け方</div>
+          <p id="dy-rule" class="rulebox"></p>
+          <div class="kv"><span>今日の記録</span><b id="dy-best">—</b></div>
+        </div>
+        <div class="spacer"></div>
+        <div class="col wide">
+          <button id="dy-go" class="btn big" type="button">挑戦する</button>
+          <button id="dy-practice" class="btn sm" type="button">広告を見て、今日の配置で練習する</button>
+        </div>
+      </section>
+
+      <!-- 記録 -->
+      <section id="scr-rec" class="scr" hidden>
+        <header class="bar">
+          <button class="back" data-go="title" type="button" aria-label="もどる">◀</button>
+          <h2>記録</h2><span></span>
+        </header>
+        <div class="panel">
+          <div id="rec-list"></div>
+          <p class="small">オンラインのランキングは、ストア版で Game Center / Google Play ゲームにつなぎます。</p>
+        </div>
+      </section>
+
+      <!-- 店 -->
+      <section id="scr-shop" class="scr" hidden>
+        <header class="bar">
+          <button class="back" data-go="title" type="button" aria-label="もどる">◀</button>
+          <h2>店</h2>
+          <span class="coins"><b class="v-coins">0</b>枚</span>
+        </header>
+        <div class="panel">
+          <div id="shop-list"></div>
+          <p class="small">ブラウザ版はデモです。購入しても請求はありません。</p>
+        </div>
+        <button id="shop-restore" class="btn sm" type="button">購入を復元</button>
+      </section>
+
+      <!-- 設定 -->
+      <section id="scr-set" class="scr" hidden>
+        <header class="bar">
+          <button class="back" data-go="title" type="button" aria-label="もどる">◀</button>
+          <h2>設定</h2><span></span>
+        </header>
+        <div class="panel">
+          <div class="toggle"><span>音</span><button id="set-sound" class="sw" type="button"></button></div>
+          <div class="toggle"><span>振動(Android)</span><button id="set-vib" class="sw" type="button"></button></div>
+          <div class="toggle"><span>点滅をへらす</span><button id="set-calm" class="sw" type="button"></button></div>
+          <button id="set-how" class="btn sm" type="button">遊び方をもう一度見る</button>
+          <button id="set-reset" class="btn sm danger" type="button">データを消す</button>
+        </div>
+        <p class="small center-text">押すな。 試作版 0.1</p>
+      </section>
+
+      <!-- 破産 -->
+      <section id="scr-broke" class="scr center" hidden>
+        <div class="panel">
+          <h2>破産</h2>
+          <p>手持ちが10枚を切りました。</p>
+          <div class="col">
+            <button id="bk-ad" class="btn big" type="button">広告を見て 200枚もらう</button>
+            <button class="btn" data-go="title" type="button">明日の配給(300枚)を待つ</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- 一時停止 -->
+      <section id="scr-pause" class="scr center" hidden>
+        <div class="panel">
+          <h2>一時停止</h2>
+          <p class="small">アプリが裏に回ったので止めました。</p>
+          <button id="ps-go" class="btn big" type="button">再開する</button>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- 広告のデモ表示 -->
+    <section id="ad" class="over" hidden>
+      <div class="adbox">
+        <div class="ad-tag">広告(デモ表示)</div>
+        <div class="ad-screen"><span>AD</span></div>
+        <p id="ad-text" class="small"></p>
+        <div class="row"><span id="ad-count"></span><button id="ad-close" class="btn sm" type="button">閉じる</button></div>
+      </div>
+    </section>
+
+    <!-- 購入のデモ確認 -->
+    <section id="buy" class="over" hidden>
+      <div class="panel">
+        <h2>購入</h2>
+        <p id="buy-text"></p>
+        <p class="small">デモです。実際の請求はありません。</p>
+        <div class="row"><button id="buy-no" class="btn" type="button">やめる</button><button id="buy-ok" class="btn big" type="button">購入する</button></div>
+      </div>
+    </section>
+
+    <div id="toast" hidden></div>
+  </div>
+</div>
+<script src="js/ink.js"></script>
+<script src="js/sound.js"></script>
+<script src="js/monetize.js"></script>
+<script src="js/game.js"></script>
+</body>
+</html>
