@@ -22,6 +22,10 @@ export interface Peg {
   cooldown: number;
   /** 連鎖(爆発・電撃)で既に狙われている */
   marked: boolean;
+  /** 倍率バンパーが、このショットであと何回掛け算できるか */
+  charges: number;
+  /** 壊れた通常ペグが灯り直すまでの秒数(0 = 灯り直さない) */
+  regrow: number;
 }
 
 export interface Ball {

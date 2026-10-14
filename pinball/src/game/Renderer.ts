@@ -60,7 +60,7 @@ export class Renderer {
   /** ペグ:平らな色の円+インクの縁+左上の小さな光。ぼんやりした光は控えめにする */
   private pegSprite(type: PegType, r: number, hp: number): HTMLCanvasElement {
     const color = PEG_COLOR[type];
-    const size = r + 12;
+    const size = r + 12 + Math.max(0, hp - 3) * 3.5;
     return this.sprite(`peg-${type}-${r}-${hp}`, size, (c) => {
       const g = c.createRadialGradient(0, 0, r * 0.6, 0, 0, size);
       g.addColorStop(0, hexA(color, 0.42));
@@ -666,10 +666,10 @@ export class Renderer {
     drawMascot(ctx, g.mascot, 364, 192, t, false, 0.46);
 
     // 時計:夜明けまでの残りショット
-    const left = g.shotsLeft;
-    const total = Math.max(1, g.shotsUsed + left);
-    const danger = left <= 1;
-    const a = -Math.PI / 2 + (g.shotsUsed / total) * Math.PI * 2;
+    const timed = !!g.mode.time;
+    const left = timed ? Math.ceil(g.timeLeft) : g.shotsLeft;
+    const danger = timed ? g.timeLeft <= 10 : left <= 1;
+    const a = -Math.PI / 2 + Math.min(1, g.nightP) * Math.PI * 2;
     ctx.strokeStyle = danger ? COLORS.blood : INK;
     ctx.lineWidth = 2.6;
     ctx.lineCap = 'round';
@@ -682,10 +682,13 @@ export class Renderer {
     ctx.translate(468, 112);
     ctx.scale(pulse, pulse);
     ctx.fillStyle = danger ? COLORS.blood : INK;
-    ctx.font = `900 34px ${NUM_FONT}`;
+    ctx.font = `900 ${left >= 100 ? 26 : 34}px ${NUM_FONT}`;
     ctx.fillText(String(left), 0, 3);
     ctx.restore();
-    this.tag(468, 172, danger ? (left === 1 ? 'ラスト 1 球' : '夜明け') : `夜明けまで ${left}`, { size: 11, dark: danger, rot: 0.03 });
+    const label = timed
+      ? left <= 0 ? '時間切れ' : `残り ${left} 秒`
+      : danger ? (left === 1 ? 'ラスト 1 球' : '夜明け') : `夜明けまで ${left}`;
+    this.tag(468, 172, label, { size: 11, dark: danger, rot: 0.03 });
 
     // 次のラインまでのバー
     const prev = g.line > 0 ? lineTarget(g.line - 1) : 0;
@@ -796,8 +799,9 @@ export class Renderer {
       }
       if (p.flash > 0) sc *= 1 + p.flash * 0.35;
       if (p.type === 'multi') sc *= 1 + Math.sin(t * 4 + p.id) * 0.03;
-      const sp = this.pegSprite(p.type, p.r, Math.min(3, p.hp));
-      const size = (p.r + 12) * sc;
+      const hpShown = Math.min(5, p.hp);
+      const sp = this.pegSprite(p.type, p.r, hpShown);
+      const size = (p.r + 12 + Math.max(0, hpShown - 3) * 3.5) * sc;
       ctx.drawImage(sp, p.x - size, p.y - size, size * 2, size * 2);
       if (p.flash > 0) {
         ctx.globalAlpha = p.flash;
@@ -808,11 +812,26 @@ export class Renderer {
         ctx.globalAlpha = 1;
       }
       if (p.type === 'multi') {
+        // 使い切ったバンパーは暗く。残り回数は下の点で
+        if (p.charges <= 0) {
+          ctx.fillStyle = 'rgba(20,15,10,0.6)';
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.r * sc + 1, 0, Math.PI * 2);
+          ctx.fill();
+        }
         ctx.font = `900 11px ${NUM_FONT}`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillStyle = INK;
+        ctx.fillStyle = p.charges > 0 ? INK : 'rgba(230,194,90,0.6)';
         ctx.fillText('×' + fmtMult(p.mult), p.x, p.y + 1);
+        ctx.fillStyle = CREAM;
+        const n = Math.min(p.charges, 6);
+        for (let i = 0; i < n; i++) {
+          const a = Math.PI / 2 + (i - (n - 1) / 2) * 0.32;
+          ctx.beginPath();
+          ctx.arc(p.x + Math.cos(a) * (p.r + 6), p.y + Math.sin(a) * (p.r + 6), 2, 0, Math.PI * 2);
+          ctx.fill();
+        }
       }
     }
   }
@@ -1113,11 +1132,35 @@ export class Renderer {
   private drawBottom(g: Game): void {
     const ctx = this.ctx;
     const y = 928;
-    const left = g.shotsLeft;
     ctx.textBaseline = 'middle';
     ctx.textAlign = 'left';
     ctx.font = `900 11px ${NUM_FONT}`;
     ctx.fillStyle = 'rgba(243,237,216,0.7)';
+    if (g.mode.time) {
+      // 九十秒:残り時間のバー
+      ctx.fillText('TIME', 16, y);
+      const k = Math.max(0, Math.min(1, g.timeLeft / g.mode.time));
+      const low = g.timeLeft <= 10;
+      ctx.strokeStyle = 'rgba(243,237,216,0.3)';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(58.5, y - 5.5, 160, 11);
+      ctx.fillStyle = low ? COLORS.red : CREAM;
+      ctx.fillRect(58, y - 6, 160 * k, 12);
+      ctx.font = `900 13px ${NUM_FONT}`;
+      ctx.fillText(`${Math.ceil(g.timeLeft)} 秒`, 226, y);
+    } else {
+      this.drawShotPips(g, y);
+    }
+    const n = g.stats.ballsPerShot * (g.boostArmed ? 2 : 1);
+    ctx.font = `800 11px ${FONT}`;
+    ctx.fillStyle = 'rgba(243,237,216,0.6)';
+    const alive = g.state === 'shoot' ? ` ・ 盤面に ${g.balls.length} 個` : '';
+    ctx.fillText(`1 ショット ${n} 球${alive}`, 16, y + 20);
+  }
+
+  private drawShotPips(g: Game, y: number): void {
+    const ctx = this.ctx;
+    const left = g.shotsLeft;
     ctx.fillText('SHOT', 16, y);
     const low = left <= 2;
     const shown = Math.min(left, 16);
@@ -1137,11 +1180,6 @@ export class Renderer {
     ctx.font = `900 13px ${NUM_FONT}`;
     ctx.fillStyle = low ? COLORS.red : CREAM;
     ctx.fillText(left > 16 ? `${left} (+${left - 16})` : String(left), 58 + 16 * 10 + 2, y);
-    const n = g.stats.ballsPerShot * (g.boostArmed ? 2 : 1);
-    ctx.font = `800 11px ${FONT}`;
-    ctx.fillStyle = 'rgba(243,237,216,0.6)';
-    const alive = g.state === 'shoot' ? ` ・ 盤面に ${g.balls.length} 個` : '';
-    ctx.fillText(`1 ショット ${n} 球${alive}`, 16, y + 20);
   }
 }
 

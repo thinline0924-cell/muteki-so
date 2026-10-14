@@ -14,7 +14,7 @@
 //   over   … 夜明けの結果画面
 
 import { AudioEngine } from './AudioEngine';
-import { generateBoard } from './BoardGen';
+import { BUMPER_CHARGES, generateBoard } from './BoardGen';
 import {
   BALL_R, COLORS, DRAIN_Y, H, LAUNCH_SPEED, LAUNCHER, MAX_BALLS, PEG_COLOR, PEG_R, PHYS_DT, W, lineTarget,
   type PegType,
@@ -22,6 +22,8 @@ import {
 import { makeMascot, updateMascot } from './Mascot';
 import { JuiceManager, fmt } from './JuiceManager';
 import { MonetizationManager } from './MonetizationManager';
+import { getMode, type ModeDef, type ModeId } from './Modes';
+import { todayKey, useSeed } from './rng';
 import { PegGrid, makeBall, predictPath, stepBall, type Ball, type Peg, type StepHooks } from './Physics';
 import { Renderer } from './Renderer';
 import { META, Save } from './Save';
@@ -53,6 +55,10 @@ export class Game {
   speed = 1;
 
   stats: RunStats;
+  /** いま遊んでいるモード */
+  mode: ModeDef = getMode('night');
+  /** 九十秒モードの残り秒数(ショット中だけ減る) */
+  timeLeft = 0;
   owned = new Map<string, number>();
   /** 合計スコアと、表示用にゆっくり追いかける数字 */
   score = 0;
@@ -110,7 +116,7 @@ export class Game {
     this.frame = this.ui.frame;
     this.renderer = new Renderer(this.ui.canvas);
     this.money = new MonetizationManager(this.save, this.audio, this.frame, (m) => this.ui.toast(m));
-    this.stats = baseStats(this.save.data.meta);
+    this.stats = baseStats(this.save.data.meta, this.mode);
     this.speed = this.save.data.pass ? Math.min(3, Math.max(1, this.save.data.speed)) : 1;
     this.audio.setMuted(this.save.data.muted);
     // 「視差効果を減らす」設定の人には画面の揺れを弱くする
@@ -250,7 +256,15 @@ export class Game {
     // 空の色:使ったショットの割合で夜が明けていく
     const total = this.shotsUsed + this.shotsLeft;
     const nightTarget =
-      this.state === 'title' ? 0 : this.sunrise ? 1 : total > 0 ? this.shotsUsed / total : 0;
+      this.state === 'title'
+        ? 0
+        : this.sunrise
+          ? 1
+          : this.mode.time
+            ? 1 - Math.max(0, this.timeLeft) / this.mode.time
+            : total > 0
+              ? this.shotsUsed / total
+              : 0;
     const prevP = this.nightP;
     this.nightP += (nightTarget - this.nightP) * Math.min(1, realDt * 1.2);
     if (Math.abs(this.nightP - prevP) > 0.0005) this.audio.setDawn(this.nightP);
@@ -286,6 +300,8 @@ export class Game {
 
   private updateShot(gdt: number): void {
     this.shotTime += gdt;
+    if (this.mode.time) this.timeLeft = Math.max(0, this.timeLeft - gdt);
+    this.updateRegrow(gdt);
     for (let i = this.launchQueue.length - 1; i >= 0; i--) {
       const q = this.launchQueue[i];
       q.t -= gdt;
@@ -314,6 +330,32 @@ export class Game {
     if (this.shotTime > 45) for (const b of this.balls) b.alive = false;
 
     if (this.balls.length === 0 && this.launchQueue.length === 0 && this.shotEvents.length === 0) this.endShot();
+  }
+
+  /** 壊れた通常ペグが、しばらくすると灯り直す(盤面がからっぽにならないように) */
+  private updateRegrow(dt: number): void {
+    let changed = false;
+    for (const p of this.pegs) {
+      if (p.alive || p.regrow <= 0) continue;
+      p.regrow -= dt;
+      if (p.regrow > 0) continue;
+      // ボールが重なっていたら少し待つ
+      if (this.balls.some((b) => (b.x - p.x) ** 2 + (b.y - p.y) ** 2 < (b.r + p.r + 4) ** 2)) {
+        p.regrow = 0.2;
+        continue;
+      }
+      this.revive(p);
+      changed = true;
+    }
+    if (changed) this.grid.rebuild(this.pegs);
+  }
+
+  private revive(p: Peg): void {
+    p.alive = true;
+    p.regrow = 0;
+    p.hp = p.maxHp = 1;
+    p.spawn = 0;
+    p.marked = false;
   }
 
   private physicsStep(dt: number): void {
@@ -365,10 +407,11 @@ export class Game {
 
   fire(angle: number): void {
     if (this.state !== 'aim') return;
-    if (this.shotsLeft <= 0) return;
+    if (!this.mode.time && this.shotsLeft <= 0) return;
+    if (this.mode.time && this.timeLeft <= 0) return;
     const n = this.stats.ballsPerShot * (this.boostArmed ? 2 : 1);
     this.boostArmed = false;
-    this.shotsLeft--;
+    if (!this.mode.time) this.shotsLeft--;
     this.shotsUsed++;
     this.beginShot();
     const spread = Math.min(0.05, 0.5 / n);
@@ -387,6 +430,13 @@ export class Game {
     this.acc = 0;
     this.safetyLeft = this.stats.safetyNets;
     this.juice.combo = 0;
+    // 倍率バンパーの回数を満タンに戻す
+    for (const p of this.pegs) if (p.type === 'multi') p.charges = BUMPER_CHARGES + this.stats.bumperCharges;
+  }
+
+  /** 終盤(ラスト 3 ショット/ラスト 20 秒)か。目覚まし時計の強化が効く */
+  private isLate(): boolean {
+    return this.mode.time ? this.timeLeft <= 20 : this.shotsLeft < 3;
   }
 
   private launchBall(angle: number): void {
@@ -442,18 +492,23 @@ export class Game {
     const combo = this.juice.addCombo(p.x);
     this.shotHits++;
     const s = this.stats;
-    let dmg = s.baseDamage * s.damageMul * TYPE_FACTOR[p.type] * (ball ? ball.dmgMul : 1) * (1 + combo * s.comboBonus);
+    // コンボの上乗せは 120 コンボで頭打ち(大量のボールで無限に伸びないように)
+    let dmg = s.baseDamage * s.damageMul * TYPE_FACTOR[p.type] * (ball ? ball.dmgMul : 1) * (1 + Math.min(combo, 120) * s.comboBonus);
+    if (s.lateBoost > 1 && this.isLate()) dmg *= s.lateBoost;
     if (this.juice.fever) dmg *= 1.5;
     const crit = Math.random() < s.critChance;
     if (crit) dmg *= s.critMul;
     this.addDamage(dmg);
-    if (source === 'bomb' || source === 'detonate') p.hp = 0;
-    else p.hp -= 1;
+    // 爆発は 2 ずつ削る(固いペグは一度では壊れない)。誘爆(コンティニュー)だけは一撃
+    if (source === 'detonate') p.hp = 0;
+    else p.hp -= source === 'bomb' ? 2 : 1;
     p.flash = 1;
     const destroyed = p.hp <= 0;
     this.juice.pegHit(p.x, p.y, PEG_COLOR[p.type], dmg, crit, destroyed);
     if (!destroyed) return;
     p.alive = false;
+    // 通常ペグはショット中でも灯り直す(特殊ペグは灯り直さない)
+    if (p.type === 'normal') p.regrow = s.regrowTime * (0.85 + Math.random() * 0.3);
     if (p.type === 'split') this.doSplit(p, ball);
     else if (p.type === 'bomb') this.doBomb(p.x, p.y, s.bombRadius);
     else if (p.type === 'lightning') this.doLightning(p);
@@ -463,6 +518,12 @@ export class Game {
   }
 
   private applyMultiplier(p: Peg): void {
+    if (p.charges <= 0) {
+      // 使い切ったバンパーは弾くだけ
+      p.flash = Math.max(p.flash, 0.3);
+      return;
+    }
+    p.charges--;
     this.juice.addCombo(p.x);
     this.shotHits++;
     this.shotDamage *= p.mult;
@@ -648,7 +709,10 @@ export class Game {
       this.after(0.45, () => this.nextTurn());
       return;
     }
-    const bonus = crossed * (1 + this.stats.lineShots);
+    // ショットが増えるのは「何本目かごと」だけ(増えすぎて夜が終わらないのを防ぐ)
+    let bonus = 0;
+    const every = this.mode.lineShotEvery;
+    if (every > 0) for (let k = this.line - crossed + 1; k <= this.line; k++) if (k % every === 0) bonus++;
     this.shotsLeft += bonus;
     this.pendingCards += crossed;
     this.state = 'busy';
@@ -660,7 +724,7 @@ export class Game {
     this.buzz([30, 50, 30]);
     const coins = Math.round((20 + this.line * 12) * crossed * this.stats.coinMul);
     this.addCoins(coins);
-    this.juice.showBanner(`LINE ${this.line} 突破!`, `ショット +${bonus} ・ 強化を選ぶ`, COLORS.ink, 1.5, 'card');
+    this.juice.showBanner(`LINE ${this.line} 突破!`, bonus > 0 ? `ショット +${bonus} ・ 強化を選ぶ` : '強化を選ぶ', COLORS.ink, 1.5, 'card');
     if (this.line > this.save.data.bestLine) this.save.data.bestLine = this.line;
     this.save.write();
     this.after(1.4, () => this.openCards());
@@ -668,7 +732,7 @@ export class Game {
 
   /** 次のショットへ。残りがなければ夜明け */
   private nextTurn(): void {
-    if (this.shotsLeft <= 0) {
+    if (this.mode.time ? this.timeLeft <= 0 : this.shotsLeft <= 0) {
       this.dawn();
       return;
     }
@@ -676,12 +740,24 @@ export class Game {
   }
 
   private toAim(): void {
-    const normals = this.pegs.filter((p) => p.type !== 'multi');
-    const alive = normals.reduce((a, p) => a + (p.alive ? 1 : 0), 0);
-    if (alive < Math.max(16, normals.length * 0.45)) {
+    // 灯り直し待ちのペグは、次のショットまでに灯る
+    let revived = false;
+    for (const p of this.pegs) {
+      if (!p.alive && p.regrow > 0) {
+        this.revive(p);
+        revived = true;
+      }
+    }
+    if (revived) this.grid.rebuild(this.pegs);
+    // 盤面の入れ替え:通常ペグが減った、または特殊ペグ(分裂・爆発・電撃)が 4 割を切ったとき
+    const normals = this.pegs.filter((p) => p.type === 'normal');
+    const specials = this.pegs.filter((p) => p.type !== 'normal' && p.type !== 'multi');
+    const aliveN = normals.reduce((a, p) => a + (p.alive ? 1 : 0), 0);
+    const aliveS = specials.reduce((a, p) => a + (p.alive ? 1 : 0), 0);
+    if (aliveN < Math.max(16, normals.length * 0.45) || (specials.length > 0 && aliveS < specials.length * 0.4)) {
       this.refreshBoard(true);
     }
-    if (this.shotsLeft === 1) this.juice.text(270, 600, 'ラスト 1 球', COLORS.red, 46, false, true);
+    if (!this.mode.time && this.shotsLeft === 1) this.juice.text(270, 600, 'ラスト 1 球', COLORS.red, 46, false, true);
     this.state = 'aim';
   }
 
@@ -720,7 +796,11 @@ export class Game {
     if (this.state !== 'cards') return;
     const r = def.apply(this.stats);
     this.owned.set(def.id, (this.owned.get(def.id) ?? 0) + 1);
-    if (r && r.shots) this.shotsLeft = Math.max(1, this.shotsLeft + r.shots);
+    if (r && r.shots) {
+      // 九十秒モードでは、ショットの増減を秒数(1 ショット = 4 秒)に置きかえる
+      if (this.mode.time) this.timeLeft = Math.max(5, this.timeLeft + r.shots * 4);
+      else this.shotsLeft = Math.max(1, this.shotsLeft + r.shots);
+    }
     this.audio.card();
     this.ui.hideCards();
     this.pendingCards--;
@@ -748,9 +828,12 @@ export class Game {
     this.state = 'busy';
     this.sunrise = true;
     const d = this.save.data;
-    const newBest = this.score > d.bestScore;
+    const key = this.bestKey();
+    const prevBest = d.bests[key] ?? 0;
+    const newBest = this.score > prevBest;
     if (newBest) {
-      d.bestScore = this.score;
+      d.bests[key] = this.score;
+      if (this.mode.id === 'night') d.bestScore = this.score;
       this.juice.text(270, 470, '自己ベスト!', COLORS.red, 56, false, true);
       this.audio.fanfare();
     } else {
@@ -758,12 +841,13 @@ export class Game {
     }
     d.bestLine = Math.max(d.bestLine, this.line);
     this.save.write();
-    this.juice.showBanner('夜明け', `SCORE ${fmt(this.score)}`, COLORS.ink, 1.6, 'card');
+    this.juice.showBanner(this.mode.time ? '時間切れ' : '夜明け', `SCORE ${fmt(this.score)}`, COLORS.ink, 1.6, 'card');
     this.after(1.7, () => {
       this.state = 'over';
       this.ui.showResult({
         score: this.score,
-        best: d.bestScore,
+        best: d.bests[key] ?? 0,
+        mode: this.mode,
         newBest,
         line: this.line,
         history: this.shotLog.slice(),
@@ -771,7 +855,7 @@ export class Game {
         maxShot: this.maxShotDamage,
         bestCombo: this.juice.bestCombo,
         coins: this.runCoins,
-        canContinue: !this.continued,
+        canContinue: !this.continued && !!this.mode.extend,
       });
     });
   }
@@ -783,7 +867,8 @@ export class Game {
       if (!ok || this.state !== 'over') return;
       this.continued = true;
       this.sunrise = false;
-      this.shotsLeft += 3;
+      this.shotsLeft += this.mode.extend?.shots ?? 0;
+      this.timeLeft += this.mode.extend?.time ?? 0;
       this.ui.hideResult();
       this.detonateAll();
     });
@@ -792,7 +877,8 @@ export class Game {
   /** 盤面のペグを発射口から近い順に全部誘爆させる(ショットは減らない) */
   private detonateAll(): void {
     this.beginShot();
-    this.juice.showBanner('全ペグ誘爆', '夜を延長 ・ ショット +3', COLORS.red, 1.5, 'stamp');
+    const ext = this.mode.extend;
+    this.juice.showBanner('全ペグ誘爆', ext?.time ? `延長 ・ +${ext.time} 秒` : `延長 ・ ショット +${ext?.shots ?? 0}`, COLORS.red, 1.5, 'stamp');
     this.juice.flash(COLORS.cream, 0.5);
     const list = this.pegs
       .filter((p) => p.alive)
@@ -809,11 +895,26 @@ export class Game {
 
   /** 結果をクリップボードへ */
   resultText(): string {
-    return `夜窓ピンボール SCORE ${fmt(this.score)} / LINE ${this.line} / 最大ショット ${fmt(this.maxShotDamage)} / 最大コンボ ${this.juice.bestCombo}`;
+    const day = this.mode.seeded ? ` ${todayKey().slice(4, 6)}/${todayKey().slice(6)}` : '';
+    return `夜窓ピンボール【${this.mode.name}${day}】SCORE ${fmt(this.score)} / LINE ${this.line} / 最大ショット ${fmt(this.maxShotDamage)} / 最大コンボ ${this.juice.bestCombo}`;
+  }
+
+  /** モードごとの自己ベストの保存名 */
+  bestKey(mode: ModeDef = this.mode): string {
+    return mode.seeded ? `daily-${todayKey()}` : mode.id;
+  }
+
+  /** モードを選んで始める */
+  startMode(id: ModeId): void {
+    this.mode = getMode(id);
+    this.newRun();
   }
 
   newRun(): void {
-    this.stats = baseStats(this.save.data.meta);
+    // 今夜の一局は日付の種で、盤面とカードを全員そろえる
+    useSeed(this.mode.seeded ? Number(todayKey()) * 7919 : null);
+    this.stats = baseStats(this.save.data.meta, this.mode);
+    this.timeLeft = this.mode.time ?? 0;
     this.owned.clear();
     this.score = 0;
     this.shownScore = 0;
@@ -838,7 +939,7 @@ export class Game {
     this.juice.endShot();
     this.juice.bestCombo = 0;
     this.refreshBoard(false);
-    this.juice.showBanner('READY', `${this.shotsLeft} ショットで夜明けまで`, COLORS.cream, 1.4);
+    this.juice.showBanner('READY', this.mode.time ? `${this.mode.time} 秒の勝負` : `${this.mode.name} ・ ${this.shotsLeft} ショット`, COLORS.cream, 1.4);
     this.audio.setCalm(false);
     this.state = 'aim';
     this.ui.hideTitle();
@@ -848,6 +949,7 @@ export class Game {
   toTitle(): void {
     this.state = 'title';
     this.sunrise = false;
+    useSeed(null);
     this.balls.length = 0;
     this.timers.length = 0;
     this.shotEvents.length = 0;
@@ -990,8 +1092,9 @@ export class Game {
         break;
       }
       case 'shots':
-        this.shotsLeft += 5;
-        this.ui.toast('ショット +5');
+        if (this.mode.time) this.timeLeft += 20;
+        else this.shotsLeft += 5;
+        this.ui.toast(this.mode.time ? '時間 +20 秒' : 'ショット +5');
         break;
       case 'resetpass':
         this.money.resetPurchase();

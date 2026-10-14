@@ -347,7 +347,7 @@ button:focus-visible { outline: calc(var(--u) * 2) dashed var(--red); outline-of
 .title-screen {
   flex-direction: column;
   justify-content: space-between;
-  padding: calc(var(--u) * 262) calc(var(--u) * 40) calc(var(--u) * 70);
+  padding: calc(var(--u) * 250) calc(var(--u) * 36) calc(var(--u) * 62);
   background: linear-gradient(180deg, transparent 0%, transparent 26%, rgba(15, 12, 8, 0.35) 60%, rgba(15, 12, 8, 0.75) 100%);
   color: var(--cream);
   text-align: center;
@@ -365,7 +365,7 @@ button:focus-visible { outline: calc(var(--u) * 2) dashed var(--red); outline-of
 .logo { margin: calc(var(--u) * 14) 0 0; font-weight: 900; line-height: 0.95; }
 .logo span { display: block; }
 .logo .l1 {
-  font-size: calc(var(--u) * 112);
+  font-size: calc(var(--u) * 92);
   letter-spacing: 0.04em;
   color: var(--cream);
   -webkit-text-stroke: calc(var(--u) * 1.5) var(--cream);
@@ -373,7 +373,7 @@ button:focus-visible { outline: calc(var(--u) * 2) dashed var(--red); outline-of
 }
 .logo .l2 {
   margin-top: calc(var(--u) * 6);
-  font-size: calc(var(--u) * 40);
+  font-size: calc(var(--u) * 34);
   letter-spacing: 0.32em;
   padding-left: 0.32em;
   color: var(--cream);
@@ -400,7 +400,30 @@ button:focus-visible { outline: calc(var(--u) * 2) dashed var(--red); outline-of
   border: calc(var(--u) * 1.5) solid var(--ink-2);
   box-shadow: 0 0 calc(var(--u) * 8) var(--c);
 }
-.title-bottom .btn { max-width: calc(var(--u) * 380); }
+.title-bottom .btn { max-width: calc(var(--u) * 400); min-height: calc(var(--u) * 44); font-size: calc(var(--u) * 15); }
+
+/* モード選び:夜の窓に浮かぶ札。一晩(基本)だけ紙の色 */
+.modes { width: 100%; max-width: calc(var(--u) * 400); display: grid; gap: calc(var(--u) * 8); }
+.mode {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: baseline;
+  gap: calc(var(--u) * 2) calc(var(--u) * 10);
+  padding: calc(var(--u) * 9) calc(var(--u) * 14);
+  text-align: left;
+  color: var(--cream);
+  background: rgba(15, 12, 8, 0.6);
+  border: calc(var(--u) * 1.5) solid rgba(243, 237, 216, 0.7);
+  transition: transform 0.06s;
+}
+.mode:active { transform: translate(calc(var(--u) * 2), calc(var(--u) * 2)); }
+.mode.main { background: var(--cream); color: var(--ink); border-color: var(--ink); box-shadow: calc(var(--u) * 4) calc(var(--u) * 5) 0 var(--ink-2); }
+.mode-name { display: flex; align-items: center; gap: calc(var(--u) * 8); }
+.mode-name b { font-size: calc(var(--u) * 19); font-weight: 900; letter-spacing: 0.06em; }
+.mode .day { font-style: normal; font-family: var(--num); font-size: calc(var(--u) * 10); padding: calc(var(--u) * 1) calc(var(--u) * 5); background: var(--red); color: var(--cream); }
+.mode-best { font-family: var(--num); font-weight: 900; font-size: calc(var(--u) * 14); text-align: right; font-variant-numeric: tabular-nums; }
+.mode-best small { font-size: calc(var(--u) * 9); opacity: 0.6; margin-right: calc(var(--u) * 4); }
+.mode-desc { grid-column: 1 / -1; font-size: calc(var(--u) * 11.5); font-weight: 700; opacity: 0.72; line-height: 1.45; }
 .title-best { font-size: calc(var(--u) * 12); font-weight: 700; color: var(--dim); }
 .title-best b { font-family: var(--num); color: var(--cream); font-weight: 900; margin-left: calc(var(--u) * 4); }
 .title-best .sep { display: inline-block; width: calc(var(--u) * 1); height: calc(var(--u) * 10); background: var(--dim); margin: 0 calc(var(--u) * 12); vertical-align: middle; }

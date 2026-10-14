@@ -6,6 +6,8 @@
 
 import type { DebugAction, Game } from '../game/Game';
 import { fmt } from '../game/JuiceManager';
+import { MODES, type ModeDef, type ModeId } from '../game/Modes';
+import { todayKey } from '../game/rng';
 import { META } from '../game/Save';
 import { RARITY_LABEL, type UpgradeDef } from '../game/Upgrades';
 
@@ -22,6 +24,7 @@ export interface ResultInfo {
   bestCombo: number;
   coins: number;
   canContinue: boolean;
+  mode: ModeDef;
 }
 
 const TEMPLATE = `
@@ -74,9 +77,8 @@ const TEMPLATE = `
         <li><i style="--c:#e6c25a"></i>倍率</li>
         <li><i style="--c:#ab95d6"></i>電撃</li>
       </ul>
-      <button class="btn paper big" data-act="start">はじめる</button>
+      <div class="modes" data-modes role="list" aria-label="遊び方を選ぶ"></div>
       <button class="btn line" data-act="meta">永続強化・ショップ</button>
-      <div class="title-best">自己ベスト <b data-best>0</b><span class="sep"></span>最大ショット <b data-bestdmg>0</b></div>
     </div>
   </section>
 
@@ -124,7 +126,8 @@ const TEMPLATE = `
 
   <section class="overlay over-screen" hidden>
     <div class="sheet over">
-      <h2 class="over-title">夜明け</h2>
+      <span class="eyebrow" data-ov="mode">一晩</span>
+      <h2 class="over-title" data-ov="title">夜明け</h2>
       <div class="over-big" data-ov="score">0</div>
       <p class="over-sub" data-ov="best">自己ベスト更新!</p>
       <figure class="history">
@@ -137,7 +140,7 @@ const TEMPLATE = `
         <li>獲得コイン <b data-ov="coins">0</b> 枚</li>
         <li class="warn" data-ov="gap">あと 0 で次のラインだった</li>
       </ul>
-      <button class="btn line-ink" data-act="continue"><span class="ad-chip ink">AD</span><span><span data-cont-label>広告を見て夜を延長</span><small>ショット +3+全ペグ誘爆(1 回だけ)</small></span></button>
+      <button class="btn line-ink" data-act="continue"><span class="ad-chip ink">AD</span><span><span data-cont-label>広告を見て夜を延長</span><small data-cont-sub>ショット +3+全ペグ誘爆(1 回だけ)</small></span></button>
       <button class="btn line-ink center" data-act="copy">結果をコピーする</button>
       <button class="btn ink" data-act="retry">もう一度</button>
       <button class="btn bare" data-act="to-title">タイトルへ</button>
@@ -156,7 +159,7 @@ export class UI {
   private game: Game;
   private q: <T extends HTMLElement = HTMLElement>(sel: string) => T;
   private toastTimer = 0;
-  private cache = { coins: -1, speed: -1, pass: false, muted: false, boost: '', hudVisible: false };
+  private cache = { coins: -1, speed: -1, pass: false, muted: false, boost: '', hudVisible: false, title: '' };
 
   constructor(root: HTMLElement, game: Game) {
     this.game = game;
@@ -179,6 +182,8 @@ export class UI {
       const dbg = btn.dataset.dbg as DebugAction | undefined;
       const tab = btn.dataset.tab;
       const metaKey = btn.dataset.metaBuy;
+      const mode = btn.dataset.mode as ModeId | undefined;
+      if (mode) g().startMode(mode);
       if (sp) g().setSpeed(Number(sp));
       if (dbg) g().debug(dbg);
       if (tab) this.setTab(tab);
@@ -218,7 +223,7 @@ export class UI {
           g().continueRun();
           break;
         case 'retry':
-          g().newRun();
+          g().startMode(g().mode.id);
           break;
         case 'to-title':
           g().toTitle();
@@ -285,6 +290,12 @@ export class UI {
       b.setAttribute('aria-pressed', String(!d.muted));
     }
     const inRun = g.state !== 'title';
+    // 上の帯の真ん中:遊んでいる間はモード名
+    const title = inRun ? g.mode.name + (g.mode.seeded ? ` ${todayKey().slice(4, 6)}/${todayKey().slice(6)}` : '') : '夜窓ピンボール';
+    if (c.title !== title) {
+      c.title = title;
+      this.q('.tb-title').textContent = title;
+    }
     if (c.hudVisible !== inRun) {
       c.hudVisible = inRun;
       this.q('.hud-bottom').classList.toggle('show', inRun);
@@ -311,8 +322,17 @@ export class UI {
 
   showTitle(): void {
     const d = this.game.save.data;
-    this.q('[data-best]').textContent = fmt(d.bestScore);
-    this.q('[data-bestdmg]').textContent = fmt(d.bestDamage);
+    const box = this.q('[data-modes]');
+    box.innerHTML = MODES.map((m) => {
+      const best = d.bests[this.game.bestKey(m)] ?? 0;
+      const day = m.seeded ? `<i class="day">${todayKey().slice(4, 6)}/${todayKey().slice(6)}</i>` : '';
+      return `
+        <button class="mode${m.id === 'night' ? ' main' : ''}" data-mode="${m.id}" role="listitem">
+          <span class="mode-name"><b>${m.name}</b>${day}</span>
+          <span class="mode-best"><small>BEST</small>${best > 0 ? fmt(best) : '—'}</span>
+          <span class="mode-desc">${m.desc}</span>
+        </button>`;
+    }).join('');
     this.q('.title-screen').hidden = false;
   }
 
@@ -401,6 +421,10 @@ export class UI {
   }
 
   showResult(r: ResultInfo): void {
+    this.q('[data-ov="mode"]').textContent = r.mode.name + (r.mode.seeded ? ` ・ ${todayKey().slice(4, 6)}/${todayKey().slice(6)} の盤面` : '');
+    this.q('[data-ov="title"]').textContent = r.mode.time ? '時間切れ' : '夜明け';
+    const ext = r.mode.extend;
+    this.q('[data-cont-sub]').textContent = ext?.time ? `${ext.time} 秒+全ペグ誘爆(1 回だけ)` : `ショット +${ext?.shots ?? 0}+全ペグ誘爆(1 回だけ)`;
     this.q('[data-ov="score"]').textContent = fmt(r.score);
     const best = this.q('[data-ov="best"]');
     best.textContent = r.newBest ? '自己ベスト更新!' : `自己ベスト ${fmt(r.best)} まで あと ${fmt(r.best - r.score)}`;
@@ -418,7 +442,8 @@ export class UI {
     this.q('[data-ov="gap"]').textContent = `あと ${fmt(r.nextGap)} で LINE ${r.line + 1} だった`;
     const cont = this.q<HTMLButtonElement>('[data-act="continue"]');
     cont.hidden = !r.canContinue;
-    this.q('[data-cont-label]').textContent = this.game.money.hasPass ? '夜を延長(パス特典)' : '広告を見て夜を延長';
+    const what = r.mode.time ? '時間を延長' : '夜を延長';
+    this.q('[data-cont-label]').textContent = this.game.money.hasPass ? `${what}(パス特典)` : `広告を見て${what}`;
     this.q('.over-screen').hidden = false;
   }
 

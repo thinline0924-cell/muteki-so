@@ -2,6 +2,7 @@
 
 import { BUMPER_R, PEG_R, type PegType } from './constants';
 import type { Peg } from './Physics';
+import { boardRand } from './rng';
 
 export interface BoardSpec {
   /** 難しさ(越えたライン数+1)。耐久ペグの割合に効く */
@@ -17,6 +18,9 @@ const AREA = { left: 58, right: 482, top: 336, bottom: 862 };
 
 let pegSeq = 1;
 
+/** 倍率バンパーが 1 ショットで掛け算できる回数(強化で増える) */
+export const BUMPER_CHARGES = 3;
+
 export function makePeg(x: number, y: number, type: PegType = 'normal', hp = 1): Peg {
   return {
     id: pegSeq++,
@@ -31,6 +35,8 @@ export function makePeg(x: number, y: number, type: PegType = 'normal', hp = 1):
     spawn: 0,
     cooldown: 0,
     marked: false,
+    charges: BUMPER_CHARGES,
+    regrow: 0,
   };
 }
 
@@ -61,7 +67,7 @@ const patterns: Pattern[] = [
         continue;
       }
       const n = Math.round((Math.PI * 2 * r) / 50);
-      const a0 = Math.random() * Math.PI;
+      const a0 = boardRand() * Math.PI;
       for (let i = 0; i < n; i++) {
         const a = a0 + (i / n) * Math.PI * 2;
         pts.push([cx + Math.cos(a) * r, cy + Math.sin(a) * r * 0.95]);
@@ -85,7 +91,7 @@ const patterns: Pattern[] = [
   () => {
     const pts: Array<[number, number]> = [];
     let row = 0;
-    const ph = Math.random() * 6;
+    const ph = boardRand() * 6;
     for (let y = AREA.top + 6; y <= AREA.bottom - 10; y += 48, row++) {
       for (let x = AREA.left + (row % 2 ? 26 : 0); x <= AREA.right; x += 52) {
         pts.push([x, y + Math.sin(x / 55 + row * 0.9 + ph) * 13]);
@@ -97,8 +103,8 @@ const patterns: Pattern[] = [
   () => {
     const pts: Array<[number, number]> = [];
     for (let tries = 0; tries < 2600 && pts.length < 105; tries++) {
-      const x = AREA.left + Math.random() * (AREA.right - AREA.left);
-      const y = AREA.top + Math.random() * (AREA.bottom - AREA.top);
+      const x = AREA.left + boardRand() * (AREA.right - AREA.left);
+      const y = AREA.top + boardRand() * (AREA.bottom - AREA.top);
       if (pts.every(([px, py]) => (px - x) ** 2 + (py - y) ** 2 > 46 * 46)) pts.push([x, y]);
     }
     return pts;
@@ -128,23 +134,34 @@ const patterns: Pattern[] = [
 
 function shuffle<T>(a: T[]): T[] {
   for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const j = Math.floor(boardRand() * (i + 1));
     [a[i], a[j]] = [a[j], a[i]];
   }
   return a;
 }
 
 export function generateBoard(spec: BoardSpec): Peg[] {
-  const pattern = patterns[(spec.wave - 1 + Math.floor(Math.random() * 2)) % patterns.length];
+  const pattern = patterns[(spec.wave - 1 + Math.floor(boardRand() * 2)) % patterns.length];
   const raw = pattern().filter(([x, y]) => inArea(x, y));
   // 少し間引いて隙間を作る
-  const kept = raw.filter(() => Math.random() > 0.08);
+  const kept = raw.filter(() => boardRand() > 0.08);
 
-  const p2 = Math.min(0.35, 0.1 + spec.wave * 0.02);
-  const p3 = Math.min(0.15, spec.wave * 0.012);
+  // 先のラインほど、何度も当てないと壊れないペグが増える(盤面がすぐ空にならないように)
+  const L = spec.wave;
+  const p5 = Math.min(0.12, Math.max(0, (L - 12) * 0.012));
+  const p4 = Math.min(0.18, Math.max(0, (L - 7) * 0.015));
+  const p3 = Math.min(0.25, Math.max(0, (L - 3) * 0.02));
+  const p2 = Math.min(0.4, 0.08 + L * 0.02);
   let pegs = kept.map(([x, y]) => {
-    const r = Math.random();
-    const hp = r < p3 ? 3 : r < p3 + p2 ? 2 : 1;
+    let r = boardRand();
+    let hp = 1;
+    for (const [pp, h] of [[p5, 5], [p4, 4], [p3, 3], [p2, 2]] as Array<[number, number]>) {
+      if (r < pp) {
+        hp = h;
+        break;
+      }
+      r -= pp;
+    }
     return makePeg(x, y, 'normal', hp);
   });
 
@@ -156,7 +173,7 @@ export function generateBoard(spec: BoardSpec): Peg[] {
     if (bumpers.length >= bumperCount) break;
     if (bumpers.some((b) => (b.x - c.x) ** 2 + (b.y - c.y) ** 2 < 125 * 125)) continue;
     const b = makePeg(c.x, c.y, 'multi', 1);
-    b.mult = (Math.random() < 0.3 ? 2.0 : 1.5) + spec.bumperBonus;
+    b.mult = (boardRand() < 0.3 ? 2.0 : 1.5) + spec.bumperBonus;
     bumpers.push(b);
   }
   pegs = pegs.filter((p) => bumpers.every((b) => (b.x - p.x) ** 2 + (b.y - p.y) ** 2 > 50 * 50));
@@ -187,6 +204,6 @@ export function generateBoard(spec: BoardSpec): Peg[] {
   }
 
   const all = pegs.concat(bumpers);
-  for (const p of all) p.spawn = -((p.y - AREA.top) / (AREA.bottom - AREA.top)) * 0.5 - Math.random() * 0.1;
+  for (const p of all) p.spawn = -((p.y - AREA.top) / (AREA.bottom - AREA.top)) * 0.5 - boardRand() * 0.1;
   return all;
 }
