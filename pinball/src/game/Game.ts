@@ -1,21 +1,25 @@
 // ゲームの司令塔。状態遷移とメインループ、ショット中の衝突処理をまとめる。
 //
+// 遊び方:限られたショット数(夜が明けるまで)で、どこまでスコアを伸ばせるか。
+//   スコアが「ライン」(目標点)を越えるたびに、強化カードを 1 枚選べて、ショットも +1。
+//   ショットを使い切ると夜明け → 最終スコアを記録して終わり。
+//
 // 状態(state):
 //   title  … タイトル画面
 //   aim    … 狙っている(ドラッグで角度を決める)
 //   shoot  … ボールが盤面を跳ねている
-//   resolve… ショットの総ダメージを敵に運んでいる
-//   enemy  … 敵の攻撃・Wave クリアの演出中(操作できない)
+//   resolve… ショットのスコアを合計に運んでいる
+//   busy   … ライン突破・夜明けの演出中(操作できない)
 //   cards  … 強化カードの 3 択
-//   over   … ゲームオーバー
+//   over   … 夜明けの結果画面
 
 import { AudioEngine } from './AudioEngine';
 import { generateBoard } from './BoardGen';
 import {
-  BALL_R, COLORS, DRAIN_Y, H, LAUNCH_SPEED, LAUNCHER, MAX_BALLS, PEG_COLOR, PEG_R, PHYS_DT, W,
+  BALL_R, COLORS, DRAIN_Y, H, LAUNCH_SPEED, LAUNCHER, MAX_BALLS, PEG_COLOR, PEG_R, PHYS_DT, W, lineTarget,
   type PegType,
 } from './constants';
-import { makeEnemy, type Enemy } from './Enemies';
+import { makeMascot, updateMascot } from './Mascot';
 import { JuiceManager, fmt } from './JuiceManager';
 import { MonetizationManager } from './MonetizationManager';
 import { PegGrid, makeBall, predictPath, stepBall, type Ball, type Peg, type StepHooks } from './Physics';
@@ -24,16 +28,16 @@ import { META, Save } from './Save';
 import { baseStats, drawCards, type RunStats, type UpgradeDef } from './Upgrades';
 import { UI } from '../ui/UI';
 
-export type State = 'title' | 'aim' | 'shoot' | 'resolve' | 'enemy' | 'cards' | 'over';
+export type State = 'title' | 'aim' | 'shoot' | 'resolve' | 'busy' | 'cards' | 'over';
 type HitSource = 'ball' | 'bomb' | 'zap' | 'detonate';
-export type DebugAction = 'fire20' | 'convert' | 'coins' | 'skip' | 'heal' | 'resetpass';
+export type DebugAction = 'fire20' | 'convert' | 'coins' | 'skip' | 'shots' | 'resetpass';
 
 interface Timed {
   t: number;
   fn: () => void;
 }
 
-/** ペグの種類ごとのダメージ倍率(倍率バンパーはダメージではなく掛け算) */
+/** ペグの種類ごとのスコア倍率(倍率バンパーは足し算ではなく掛け算) */
 const TYPE_FACTOR: Record<PegType, number> = { normal: 1, split: 1, bomb: 2, multi: 0, lightning: 1.5 };
 
 export class Game {
@@ -50,9 +54,16 @@ export class Game {
 
   stats: RunStats;
   owned = new Map<string, number>();
-  wave = 1;
-  hp = 100;
-  enemy: Enemy | null = null;
+  /** 合計スコアと、表示用にゆっくり追いかける数字 */
+  score = 0;
+  shownScore = 0;
+  scorePop = 0;
+  /** 越えたラインの数 */
+  line = 0;
+  /** 残りショット数と、使ったショット数 */
+  shotsLeft = 10;
+  shotsUsed = 0;
+  readonly mascot = makeMascot();
   pegs: Peg[] = [];
   readonly grid = new PegGrid();
   balls: Ball[] = [];
@@ -66,7 +77,6 @@ export class Game {
   shotsFired = 0;
   dmgPop = 0;
   launcherKick = 0;
-  hurtT = 0;
   resolveAnim: { t: number; dur: number; amount: number } | null = null;
   runCoins = 0;
   maxShotDamage = 0;
@@ -77,6 +87,7 @@ export class Game {
   private acc = 0;
   private safetyLeft = 0;
   private continued = false;
+  private pendingCards = 0;
   private wallFxT = 0;
   private lastTime = 0;
   private frameEma = 16;
@@ -92,7 +103,6 @@ export class Game {
     this.renderer = new Renderer(this.ui.canvas);
     this.money = new MonetizationManager(this.save, this.audio, this.frame, (m) => this.ui.toast(m));
     this.stats = baseStats(this.save.data.meta);
-    this.hp = this.stats.maxHp;
     this.speed = this.save.data.pass ? Math.min(3, Math.max(1, this.save.data.speed)) : 1;
     this.audio.setMuted(this.save.data.muted);
     this.hooks = {
@@ -143,7 +153,7 @@ export class Game {
       if (!this.aim.active) return;
       this.aim.active = false;
       const p = toLogical(e);
-      // 発射口より上(敵のあたり)で離したらキャンセル
+      // 発射口より上(壁のあたり)で離したらキャンセル
       if (p.y < LAUNCHER.y - 30 || this.state !== 'aim') {
         this.prediction = null;
         return;
@@ -222,17 +232,17 @@ export class Game {
       if (p.flash > 0) p.flash = Math.max(0, p.flash - realDt * 5);
       if (p.cooldown > 0) p.cooldown -= gdt;
     }
-    const e = this.enemy;
-    if (e) {
-      if (e.enterT < 1) e.enterT = Math.min(1, e.enterT + realDt * 1.8);
-      if (e.hitT > 0) e.hitT = Math.max(0, e.hitT - realDt * 2.2);
-      if (e.attackT > 0) e.attackT = Math.max(0, e.attackT - realDt * 1.7);
-      if (e.deathT > 0) e.deathT += realDt * 1.2;
-      if (e.hitT < 0.6) e.shownHp += (e.hp - e.shownHp) * Math.min(1, realDt * 4);
+    updateMascot(this.mascot, realDt);
+    // 合計スコアはカウンターのように数字を回して追いつく
+    if (this.shownScore < this.score) {
+      this.shownScore += Math.max(1, (this.score - this.shownScore) * Math.min(1, realDt * 5));
+      if (this.score - this.shownScore < 1) this.shownScore = this.score;
+    } else {
+      this.shownScore = this.score;
     }
+    this.scorePop = Math.max(0, this.scorePop - realDt * 3);
     this.dmgPop = Math.max(0, this.dmgPop - realDt * 5);
     this.launcherKick = Math.max(0, this.launcherKick - realDt * 6);
-    this.hurtT = Math.max(0, this.hurtT - realDt * 1.5);
     this.wallFxT -= realDt;
 
     if (this.state === 'shoot') this.updateShot(gdt);
@@ -242,7 +252,7 @@ export class Game {
       if (this.resolveAnim.t >= this.resolveAnim.dur) {
         const amount = this.resolveAnim.amount;
         this.resolveAnim = null;
-        this.hitEnemy(amount);
+        this.addScore(amount);
       }
     }
 
@@ -334,8 +344,11 @@ export class Game {
 
   fire(angle: number): void {
     if (this.state !== 'aim') return;
+    if (this.shotsLeft <= 0) return;
     const n = this.stats.ballsPerShot * (this.boostArmed ? 2 : 1);
     this.boostArmed = false;
+    this.shotsLeft--;
+    this.shotsUsed++;
     this.beginShot();
     const spread = Math.min(0.05, 0.5 / n);
     for (let i = 0; i < n; i++) {
@@ -461,9 +474,9 @@ export class Game {
       ball.vy = Math.sin(a) * speed;
     }
     if (n < extra) {
-      // 上限に達したらボールの代わりにダメージボーナス
+      // 上限に達したらボールの代わりにスコアボーナス
       this.addDamage(this.stats.baseDamage * this.stats.damageMul * 5 * (extra - n));
-      this.juice.text(p.x, p.y - 30, 'MAX → DMG', COLORS.cream, 15);
+      this.juice.text(p.x, p.y - 30, 'MAX → +SCORE', COLORS.cream, 15);
     }
     this.juice.split(p.x, p.y, n + 1);
   }
@@ -571,88 +584,79 @@ export class Game {
     if (amount > this.save.data.bestDamage) this.save.data.bestDamage = amount;
     if (amount <= 0) {
       this.juice.text(270, 330, 'MISS', COLORS.cream, 30, true);
-      this.after(0.5, () => this.enemyTurn());
+      this.after(0.5, () => this.nextTurn());
       return;
     }
     this.resolveAnim = { t: 0, dur: 0.5, amount };
   }
 
-  private hitEnemy(amount: number): void {
-    const e = this.enemy;
-    if (!e) return;
-    e.hp -= amount;
-    e.hitT = 1;
+  /** ショットのスコアを合計に足し、ラインを越えたか調べる */
+  private addScore(amount: number): void {
+    this.score += amount;
+    this.scorePop = 1;
+    this.mascot.hop = 1;
     const power = Math.log10(amount + 1);
-    this.juice.shake(4 + power * 3);
-    this.juice.hitStop(45);
-    this.juice.burst(270, 130, COLORS.cream, 40, 650, 3.2);
-    this.juice.burst(270, 130, COLORS.blood, 24, 420, 2.6);
-    this.juice.ring(270, 130, 90 + power * 10, COLORS.cream, 6, 0.45);
-    this.juice.text(270, 110, `-${fmt(amount)}`, COLORS.red, 30 + Math.min(24, power * 4), false, true);
-    this.audio.enemyHit(power / 2);
+    this.juice.shake(3 + power * 2);
+    this.juice.hitStop(35);
+    this.juice.burst(270, 104, COLORS.cream, 30, 520, 2.6);
+    this.juice.ring(270, 104, 70 + power * 10, COLORS.cream, 5, 0.4);
+    this.juice.text(270, 150, `+${fmt(amount)}`, COLORS.cream, 24 + Math.min(16, power * 3), true);
+    this.audio.scoreHit(power / 3);
+    this.audio.coin();
     this.addCoins(Math.floor(Math.sqrt(amount) * 0.4 * this.stats.coinMul));
-    if (e.hp <= 0) {
-      e.hp = 0;
-      this.state = 'enemy';
-      this.after(0.45, () => this.waveClear());
-    } else {
-      this.after(0.5, () => this.enemyTurn());
-    }
+    this.checkLines();
   }
 
-  private enemyTurn(): void {
-    const e = this.enemy;
-    if (!e) return;
-    e.countdown--;
-    if (e.countdown > 0) {
-      this.toAim();
+  private checkLines(): void {
+    let crossed = 0;
+    while (this.score >= lineTarget(this.line)) {
+      this.line++;
+      crossed++;
+    }
+    if (crossed === 0) {
+      this.after(0.45, () => this.nextTurn());
       return;
     }
-    this.state = 'enemy';
-    e.attackT = 1;
-    this.audio.enemyAttack();
-    this.after(0.28, () => {
-      this.hp -= e.atk;
-      this.hurtT = 1;
-      this.juice.shake(20);
-      this.juice.flash(COLORS.blood, 0.3);
-      this.juice.hitStop(50);
-      // 窓ガラスにヒビ+赤いハンコ文字
-      const cx = 140 + Math.random() * 260;
-      const cy = 420 + Math.random() * 300;
-      e.countdown = e.maxCountdown;
-      if (this.hp <= 0) {
-        this.hp = 0;
-        this.juice.crack(cx, cy, 420, 3);
-        this.juice.crack(W - cx, cy - 160, 260, 3);
-        this.juice.text(270, 600, 'やられた', COLORS.red, 72, false, true);
-        this.after(1.1, () => this.gameOver());
-      } else {
-        this.juice.crack(cx, cy, 240);
-        this.juice.text(cx, cy, 'ヒビ!', COLORS.red, 44, false, true);
-        this.juice.text(130, 890, `-${e.atk}`, COLORS.red, 28, true);
-        this.after(0.6, () => this.toAim());
-      }
-    });
+    const bonus = crossed * (1 + this.stats.lineShots);
+    this.shotsLeft += bonus;
+    this.pendingCards += crossed;
+    this.state = 'busy';
+    this.mascot.cheer = 1;
+    this.juice.burst(270, 104, COLORS.multi, 40, 700, 3.2);
+    this.juice.flash(COLORS.cream, 0.3);
+    this.juice.shake(12);
+    this.audio.fanfare();
+    const coins = Math.round((20 + this.line * 12) * crossed * this.stats.coinMul);
+    this.addCoins(coins);
+    this.juice.showBanner(`LINE ${this.line} 突破!`, `ショット +${bonus} ・ 強化を選ぶ`, COLORS.ink, 1.5, 'card');
+    if (this.line > this.save.data.bestLine) this.save.data.bestLine = this.line;
+    this.save.write();
+    this.after(1.4, () => this.openCards());
+  }
+
+  /** 次のショットへ。残りがなければ夜明け */
+  private nextTurn(): void {
+    if (this.shotsLeft <= 0) {
+      this.dawn();
+      return;
+    }
+    this.toAim();
   }
 
   private toAim(): void {
-    if (this.stats.regen > 0 && this.hp < this.stats.maxHp) {
-      this.hp = Math.min(this.stats.maxHp, this.hp + this.stats.regen);
-      this.juice.text(130, 890, `+${this.stats.regen} HP`, COLORS.cream, 18);
-    }
     const normals = this.pegs.filter((p) => p.type !== 'multi');
     const alive = normals.reduce((a, p) => a + (p.alive ? 1 : 0), 0);
     if (alive < Math.max(16, normals.length * 0.45)) {
       this.refreshBoard(true);
     }
+    if (this.shotsLeft === 1) this.juice.text(270, 600, 'ラスト 1 球', COLORS.red, 46, false, true);
     this.state = 'aim';
   }
 
   private boardSpec() {
     const s = this.stats;
     return {
-      wave: this.wave,
+      wave: this.line + 1,
       extraSplit: s.extraSplit,
       extraBomb: s.extraBomb,
       extraLightning: s.extraLightning,
@@ -670,95 +674,90 @@ export class Game {
     }
   }
 
-  // ───────── Wave・カード・ゲームオーバー ─────────
-
-  private waveClear(): void {
-    const e = this.enemy;
-    if (!e) return;
-    this.state = 'enemy';
-    e.deathT = 0.001;
-    this.balls.length = 0;
-    this.launchQueue.length = 0;
-    this.shotEvents.length = 0;
-    this.juice.burst(270, 140, COLORS.cream, 50, 760, 3.6);
-    this.juice.burst(270, 140, COLORS.multi, 24, 520, 2.6);
-    this.juice.ring(270, 140, 160, COLORS.cream, 8, 0.6);
-    this.juice.flash(COLORS.cream, 0.4);
-    this.juice.shake(16);
-    this.audio.waveClear();
-    const coins = Math.round((20 + this.wave * 12) * this.stats.coinMul);
-    this.addCoins(coins);
-    this.juice.showBanner('撃破!', `WAVE ${this.wave} クリア ・ +${coins} 枚`, COLORS.ink, 1.6, 'card');
-    this.hp = Math.min(this.stats.maxHp, this.hp + Math.round(this.stats.maxHp * 0.1));
-    if (this.wave > this.save.data.bestWave) this.save.data.bestWave = this.wave;
-    this.save.write();
-    this.after(1.5, () => this.openCards());
-  }
+  // ───────── 強化カード・夜明け ─────────
 
   private openCards(): void {
     this.state = 'cards';
-    this.ui.showCards(drawCards(this.owned), this.wave);
+    this.balls.length = 0;
+    this.launchQueue.length = 0;
+    this.shotEvents.length = 0;
+    this.ui.showCards(drawCards(this.owned), this.line - this.pendingCards + 1);
   }
 
   pickCard(def: UpgradeDef): void {
     if (this.state !== 'cards') return;
     const r = def.apply(this.stats);
     this.owned.set(def.id, (this.owned.get(def.id) ?? 0) + 1);
-    if (r && r.heal) this.hp = Math.min(this.stats.maxHp, this.hp + r.heal);
-    this.hp = Math.min(this.hp, this.stats.maxHp);
+    if (r && r.shots) this.shotsLeft = Math.max(1, this.shotsLeft + r.shots);
     this.audio.card();
     this.ui.hideCards();
-    this.nextWave();
+    this.pendingCards--;
+    if (this.pendingCards > 0) {
+      this.openCards();
+      return;
+    }
+    // 盤面に効く強化(ペグ追加など)をすぐ反映させる
+    this.refreshBoard(false);
+    this.nextTurn();
   }
 
   rerollCards(): void {
     if (this.state !== 'cards') return;
     void this.money.showRewardedAd('reroll').then((ok) => {
       if (ok && this.state === 'cards') {
-        this.ui.showCards(drawCards(this.owned), this.wave);
+        this.ui.showCards(drawCards(this.owned), this.line - this.pendingCards + 1);
         this.audio.card();
       }
     });
   }
 
-  private nextWave(): void {
-    this.wave++;
-    this.enemy = makeEnemy(this.wave);
-    this.refreshBoard(false);
-    this.juice.showBanner(this.enemy.boss ? 'BOSS' : `WAVE ${this.wave}`, this.enemy.name, this.enemy.boss ? COLORS.red : COLORS.cream, 1.5);
-    this.state = 'aim';
-  }
-
-  private gameOver(): void {
-    this.state = 'over';
-    this.audio.gameOver();
-    if (this.wave > this.save.data.bestWave) this.save.data.bestWave = this.wave;
+  /** ショットを使い切った:夜明け → 結果 */
+  private dawn(): void {
+    this.state = 'busy';
+    const d = this.save.data;
+    const newBest = this.score > d.bestScore;
+    if (newBest) {
+      d.bestScore = this.score;
+      this.juice.text(270, 470, '自己ベスト!', COLORS.red, 56, false, true);
+      this.audio.fanfare();
+    } else {
+      this.audio.dawn();
+    }
+    d.bestLine = Math.max(d.bestLine, this.line);
     this.save.write();
-    this.ui.showGameOver({
-      wave: this.wave,
-      maxDamage: this.maxShotDamage,
-      bestCombo: this.juice.bestCombo,
-      coins: this.runCoins,
-      remain: this.enemy ? Math.max(0, this.enemy.hp) : 0,
-      canContinue: !this.continued,
+    this.juice.showBanner('夜明け', `SCORE ${fmt(this.score)}`, COLORS.ink, 1.6, 'card');
+    this.after(1.7, () => {
+      this.state = 'over';
+      this.ui.showResult({
+        score: this.score,
+        best: d.bestScore,
+        newBest,
+        line: this.line,
+        nextGap: lineTarget(this.line) - this.score,
+        maxShot: this.maxShotDamage,
+        bestCombo: this.juice.bestCombo,
+        coins: this.runCoins,
+        canContinue: !this.continued,
+      });
     });
   }
 
+  /** 広告で夜を延長:ショット +3 と、盤面の全ペグ誘爆 */
   continueRun(): void {
     if (this.state !== 'over' || this.continued) return;
     void this.money.showRewardedAd('continue').then((ok) => {
       if (!ok || this.state !== 'over') return;
       this.continued = true;
-      this.hp = this.stats.maxHp;
-      this.ui.hideGameOver();
+      this.shotsLeft += 3;
+      this.ui.hideResult();
       this.detonateAll();
     });
   }
 
-  /** コンティニュー報酬:盤面のペグを発射口から近い順に全部誘爆させる */
+  /** 盤面のペグを発射口から近い順に全部誘爆させる(ショットは減らない) */
   private detonateAll(): void {
     this.beginShot();
-    this.juice.showBanner('全ペグ誘爆', 'HP 全快でコンティニュー', COLORS.red, 1.5, 'stamp');
+    this.juice.showBanner('全ペグ誘爆', '夜を延長 ・ ショット +3', COLORS.red, 1.5, 'stamp');
     this.juice.flash(COLORS.cream, 0.5);
     const list = this.pegs
       .filter((p) => p.alive)
@@ -773,12 +772,20 @@ export class Game {
     });
   }
 
+  /** 結果をクリップボードへ */
+  resultText(): string {
+    return `夜窓ピンボール SCORE ${fmt(this.score)} / LINE ${this.line} / 最大ショット ${fmt(this.maxShotDamage)} / 最大コンボ ${this.juice.bestCombo}`;
+  }
+
   newRun(): void {
     this.stats = baseStats(this.save.data.meta);
     this.owned.clear();
-    this.wave = 1;
-    this.hp = this.stats.maxHp;
-    this.enemy = makeEnemy(1);
+    this.score = 0;
+    this.shownScore = 0;
+    this.line = 0;
+    this.shotsLeft = this.stats.startShots;
+    this.shotsUsed = 0;
+    this.pendingCards = 0;
     this.continued = false;
     this.runCoins = 0;
     this.maxShotDamage = 0;
@@ -793,16 +800,15 @@ export class Game {
     this.juice.endShot();
     this.juice.bestCombo = 0;
     this.refreshBoard(false);
-    this.juice.showBanner('READY', this.enemy.name, COLORS.cream, 1.4);
+    this.juice.showBanner('READY', `${this.shotsLeft} ショットで夜明けまで`, COLORS.cream, 1.4);
     this.audio.setCalm(false);
     this.state = 'aim';
     this.ui.hideTitle();
-    this.ui.hideGameOver();
+    this.ui.hideResult();
   }
 
   toTitle(): void {
     this.state = 'title';
-    this.enemy = null;
     this.balls.length = 0;
     this.timers.length = 0;
     this.shotEvents.length = 0;
@@ -810,7 +816,7 @@ export class Game {
     this.juice.clearEffects();
     this.refreshBoard(false);
     this.audio.setCalm(true);
-    this.ui.hideGameOver();
+    this.ui.hideResult();
     this.ui.showTitle();
   }
 
@@ -924,24 +930,19 @@ export class Game {
         this.ui.toast('コイン +10,000');
         break;
       case 'skip': {
-        if (!this.enemy || !['aim', 'shoot', 'resolve', 'enemy'].includes(this.state) || this.enemy.deathT > 0) {
-          this.ui.toast('戦闘中に使えます');
+        if (this.state !== 'aim') {
+          this.ui.toast('狙っている間に使えます');
           return;
         }
-        this.balls.length = 0;
-        this.launchQueue.length = 0;
-        this.shotEvents.length = 0;
-        this.timers.length = 0;
-        this.resolveAnim = null;
-        this.juice.endShot();
-        this.enemy.hp = 0;
-        if (this.hp <= 0) this.hp = 1;
-        this.waveClear();
+        this.state = 'resolve';
+        this.score = Math.max(this.score, lineTarget(this.line));
+        this.scorePop = 1;
+        this.checkLines();
         break;
       }
-      case 'heal':
-        this.hp = this.stats.maxHp;
-        this.ui.toast('HP 全快');
+      case 'shots':
+        this.shotsLeft += 5;
+        this.ui.toast('ショット +5');
         break;
       case 'resetpass':
         this.money.resetPurchase();

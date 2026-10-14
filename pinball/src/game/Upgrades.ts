@@ -9,9 +9,9 @@ export interface RunStats {
   bombRadius: number;
   lightningMin: number;
   lightningMax: number;
-  /** 壁反射 1 回ごとのダメージ上昇 */
+  /** 壁反射 1 回ごとのスコア上昇 */
   wallBonus: number;
-  /** コンボ 1 つごとのダメージ上昇 */
+  /** コンボ 1 つごとのスコア上昇 */
   comboBonus: number;
   critChance: number;
   critMul: number;
@@ -21,11 +21,13 @@ export interface RunStats {
   extraBomb: number;
   extraLightning: number;
   extraBumpers: number;
-  maxHp: number;
+  /** 1 回の挑戦で撃てるショット数(はじめの数) */
+  startShots: number;
   safetyNets: number;
   chainBomb: number;
   coinMul: number;
-  regen: number;
+  /** ラインを越えたときに追加でもらえるショット */
+  lineShots: number;
 }
 
 export function baseStats(meta: { atk: number; balls: number; hp: number; coin: number }): RunStats {
@@ -47,11 +49,11 @@ export function baseStats(meta: { atk: number; balls: number; hp: number; coin: 
     extraBomb: 0,
     extraLightning: 0,
     extraBumpers: 0,
-    maxHp: 100 + meta.hp * 20,
+    startShots: 10 + meta.hp,
     safetyNets: 0,
     chainBomb: 0,
     coinMul: 1 + meta.coin * 0.25,
-    regen: 0,
+    lineShots: 0,
   };
 }
 
@@ -65,8 +67,8 @@ export interface UpgradeDef {
   color: string;
   rarity: Rarity;
   max?: number;
-  /** stats を書き換える。heal は HP を回復したいときに返す量 */
-  apply(s: RunStats): { heal?: number } | void;
+  /** stats を書き換える。shots は残りショットを増減したいときに返す量 */
+  apply(s: RunStats): { shots?: number } | void;
 }
 
 export const UPGRADES: UpgradeDef[] = [
@@ -95,11 +97,11 @@ export const UPGRADES: UpgradeDef[] = [
     apply: (s) => { s.ballsPerShot += 1; },
   },
   {
-    id: 'wall_relic', name: '反射の護符', desc: '【レリック】壁で反射するたび、そのボールのダメージ +20%', icon: '⟲', color: '#9dffcf', rarity: 'rare',
+    id: 'wall_relic', name: '反射の護符', desc: '【レリック】壁で反射するたび、そのボールのスコア +20%', icon: '⟲', color: '#9dffcf', rarity: 'rare',
     apply: (s) => { s.wallBonus += 0.2; },
   },
   {
-    id: 'sharp', name: '研いだ釘', desc: 'すべてのダメージ +40%', icon: '▲', color: '#fff0cc', rarity: 'common',
+    id: 'sharp', name: '研いだ釘', desc: 'すべてのスコア +40%', icon: '▲', color: '#fff0cc', rarity: 'common',
     apply: (s) => { s.damageMul += 0.4; },
   },
   {
@@ -111,11 +113,11 @@ export const UPGRADES: UpgradeDef[] = [
     apply: (s) => { s.splitCount += 1; },
   },
   {
-    id: 'combo', name: 'コンボマスター', desc: 'コンボ 1 つごとのダメージ上昇 +2%', icon: '♪', color: '#ff9bd6', rarity: 'rare',
+    id: 'combo', name: 'コンボマスター', desc: 'コンボ 1 つごとのスコア上昇 +2%', icon: '♪', color: '#ff9bd6', rarity: 'rare',
     apply: (s) => { s.comboBonus += 0.02; },
   },
   {
-    id: 'crit', name: '会心の一撃', desc: 'クリティカル率 +10%(ダメージ ×3)', icon: '✦', color: '#ff6b6b', rarity: 'common', max: 6,
+    id: 'crit', name: '会心の一撃', desc: 'クリティカル率 +10%(スコア ×3)', icon: '✦', color: '#ff6b6b', rarity: 'common', max: 6,
     apply: (s) => { s.critChance += 0.1; },
   },
   {
@@ -123,12 +125,12 @@ export const UPGRADES: UpgradeDef[] = [
     apply: (s) => { s.bumperBonus += 0.25; },
   },
   {
-    id: 'heavy', name: '鉄球', desc: 'ボールが 20% 大きくなり、ダメージ +25%', icon: '⬤', color: '#d9d2b0', rarity: 'common', max: 2,
+    id: 'heavy', name: '鉄球', desc: 'ボールが 20% 大きくなり、スコア +25%', icon: '⬤', color: '#d9d2b0', rarity: 'common', max: 2,
     apply: (s) => { s.ballRadiusMul *= 1.2; s.damageMul += 0.25; },
   },
   {
-    id: 'vitality', name: 'あたたかいスープ', desc: '最大 HP +25 して全回復', icon: '♥', color: '#ff8a7a', rarity: 'common',
-    apply: (s) => { s.maxHp += 25; return { heal: 9999 }; },
+    id: 'vitality', name: '夜ふかし', desc: '残りショット +3', icon: '☾', color: '#ff8a7a', rarity: 'common',
+    apply: () => ({ shots: 3 }),
   },
   {
     id: 'safety', name: 'セーフティネット', desc: 'ショットごとに 1 回、落ちたボールを打ち上げる', icon: '☂', color: '#9dffcf', rarity: 'rare', max: 3,
@@ -143,12 +145,12 @@ export const UPGRADES: UpgradeDef[] = [
     apply: (s) => { s.coinMul += 0.5; },
   },
   {
-    id: 'regen', name: '観葉植物の癒し', desc: 'ショットごとに HP +5', icon: '❀', color: '#9dffcf', rarity: 'common',
-    apply: (s) => { s.regen += 5; },
+    id: 'regen', name: 'おかわり', desc: 'ラインを越えるたび、ショットがさらに +1', icon: '❀', color: '#9dffcf', rarity: 'rare', max: 3,
+    apply: (s) => { s.lineShots += 1; },
   },
   {
-    id: 'glass', name: 'ガラスの大砲', desc: 'すべてのダメージ ×2、ただし最大 HP -30%', icon: '◇', color: '#c8f7ff', rarity: 'epic', max: 2,
-    apply: (s) => { s.damageMul *= 2; s.maxHp = Math.max(20, Math.round(s.maxHp * 0.7)); },
+    id: 'glass', name: 'ガラスの大砲', desc: 'すべてのスコア ×2、ただし残りショット -2', icon: '◇', color: '#c8f7ff', rarity: 'epic', max: 2,
+    apply: (s) => { s.damageMul *= 2; return { shots: -2 }; },
   },
 ];
 

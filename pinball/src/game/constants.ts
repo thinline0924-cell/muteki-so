@@ -21,6 +21,13 @@ export const BUMPER_R = 21;
 export const MAX_BALLS = 320;
 
 export const FEVER_COMBO = 50;
+
+/** k 本目のライン(合計スコアの目標)。500 から 2.4 倍ずつ上がり、きりのいい数に丸める */
+export function lineTarget(k: number): number {
+  const v = 500 * Math.pow(2.4, k);
+  const mag = Math.pow(10, Math.floor(Math.log10(v)) - 1);
+  return Math.round(v / mag) * mag;
+}
 export const COMBO_TIMEOUT = 1.5;
 
 // 色:セピアの紙とインク+差し色の赤。ペグの色も彩度を落として同じ世界に置く

@@ -17,7 +17,7 @@ const FAKE_ADS = [
 const LABEL: Record<AdPlacement, string> = {
   reroll: '強化カードを引き直し',
   boost: '今回のショットだけボール 2 倍',
-  continue: '全快+全ペグ誘爆でコンティニュー',
+  continue: '夜を延長(ショット +3+全ペグ誘爆)',
 };
 
 export class MonetizationManager {

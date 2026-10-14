@@ -1,8 +1,8 @@
 // JuiceManager:爽快感(ゲームジュース)の司令塔。
 // 衝突のたびに Game から呼ばれ、音・ヒットストップ・スロー・カメラシェイク・
-// 火花・飛び出す文字・ガラスのヒビ・フィーバーをまとめて起こす。
+// 火花・飛び出す文字・フィーバーをまとめて起こす。
 //
-// 見た目の約束:文字はクリーム白の極太+インクの縁取り。赤は「危ない・大きい」ときだけ。
+// 見た目の約束:文字はクリーム白の極太+インクの縁取り。赤は「強調・大事なとき」だけ。
 
 import type { AudioEngine } from './AudioEngine';
 import { COLORS, COMBO_TIMEOUT, FEVER_COMBO, FONT, NUM_FONT, W } from './constants';
@@ -56,13 +56,6 @@ interface Bolt {
   color: string;
 }
 
-/** ガラスのヒビ:線分(x1,y1,x2,y2)を並べたもの */
-interface Crack {
-  segs: number[];
-  life: number;
-  max: number;
-}
-
 /** text = 白い極太文字+紙のタグ / card = 紙のカード / stamp = 赤いハンコ */
 export type BannerStyle = 'text' | 'card' | 'stamp';
 
@@ -87,7 +80,6 @@ export class JuiceManager {
   texts: FloatText[] = [];
   rings: Ring[] = [];
   bolts: Bolt[] = [];
-  cracks: Crack[] = [];
   banner: Banner | null = null;
 
   combo = 0;
@@ -233,43 +225,6 @@ export class JuiceManager {
     this.bolts.push({ pts, life: 0.28, max: 0.28, color });
   }
 
-  /** ガラスにヒビを入れる(敵の攻撃・ゲームオーバー) */
-  crack(x: number, y: number, size: number, life = 1.6): void {
-    const segs: number[] = [];
-    const branch = (sx: number, sy: number, ang: number, len: number, depth: number) => {
-      let cx = sx;
-      let cy = sy;
-      let a = ang;
-      let left = len;
-      while (left > 0) {
-        const step = rand(14, 30);
-        a += rand(-0.35, 0.35);
-        const nx = cx + Math.cos(a) * step;
-        const ny = cy + Math.sin(a) * step;
-        segs.push(cx, cy, nx, ny);
-        cx = nx;
-        cy = ny;
-        left -= step;
-        if (depth < 2 && Math.random() < 0.18) branch(cx, cy, a + rand(-1, 1), left * rand(0.3, 0.6), depth + 1);
-      }
-    };
-    const n = 7 + Math.floor(Math.random() * 4);
-    const a0 = Math.random() * Math.PI * 2;
-    const ringPts: number[] = [];
-    for (let i = 0; i < n; i++) {
-      const a = a0 + (i / n) * Math.PI * 2 + rand(-0.2, 0.2);
-      branch(x, y, a, size * rand(0.55, 1.1), 0);
-      const rr = size * rand(0.12, 0.2);
-      ringPts.push(x + Math.cos(a) * rr, y + Math.sin(a) * rr);
-    }
-    // 中心のまわりの細かい割れ
-    for (let i = 0; i < n; i++) {
-      const j = (i + 1) % n;
-      segs.push(ringPts[i * 2], ringPts[i * 2 + 1], ringPts[j * 2], ringPts[j * 2 + 1]);
-    }
-    this.cracks.push({ segs, life, max: life });
-  }
-
   showBanner(text: string, sub: string, color: string, life = 1.4, style: BannerStyle = 'text'): void {
     this.banner = { text, sub, color, life, max: life, style, rot: style === 'text' ? 0 : rand(-0.06, -0.02) };
   }
@@ -352,7 +307,7 @@ export class JuiceManager {
   startFever(): void {
     this.fever = true;
     this.feverT = 0;
-    this.showBanner('FEVER', `${FEVER_COMBO} COMBO 突破 ・ ダメージ ×1.5`, COLORS.cream, 1.6, 'text');
+    this.showBanner('FEVER', `${FEVER_COMBO} COMBO 突破 ・ スコア ×1.5`, COLORS.cream, 1.6, 'text');
     this.flash(COLORS.cream, 0.35);
     this.shake(12);
     this.audio.feverStart();
@@ -435,11 +390,6 @@ export class JuiceManager {
       if (this.bolts[i].life <= 0) this.bolts.splice(i, 1);
     }
 
-    for (let i = this.cracks.length - 1; i >= 0; i--) {
-      this.cracks[i].life -= realDt;
-      if (this.cracks[i].life <= 0) this.cracks.splice(i, 1);
-    }
-
     if (this.banner) {
       this.banner.life -= realDt;
       if (this.banner.life <= 0) this.banner = null;
@@ -451,7 +401,6 @@ export class JuiceManager {
     this.texts.length = 0;
     this.rings.length = 0;
     this.bolts.length = 0;
-    this.cracks.length = 0;
   }
 
   /** パーティクル・リング・稲妻(加算合成で光らせる) */
@@ -571,35 +520,6 @@ export class JuiceManager {
     ctx.restore();
   }
 
-  /** ガラスのヒビ(いちばん手前に描く) */
-  drawCracks(ctx: CanvasRenderingContext2D): void {
-    if (this.cracks.length === 0) return;
-    ctx.save();
-    ctx.lineCap = 'round';
-    for (const c of this.cracks) {
-      const a = Math.min(1, (c.life / c.max) * 3);
-      const s = c.segs;
-      ctx.globalAlpha = a * 0.9;
-      ctx.strokeStyle = COLORS.ink;
-      ctx.lineWidth = 2.4;
-      ctx.beginPath();
-      for (let i = 0; i < s.length; i += 4) {
-        ctx.moveTo(s[i], s[i + 1]);
-        ctx.lineTo(s[i + 2], s[i + 3]);
-      }
-      ctx.stroke();
-      ctx.globalAlpha = a * 0.7;
-      ctx.strokeStyle = COLORS.cream;
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      for (let i = 0; i < s.length; i += 4) {
-        ctx.moveTo(s[i] + 1.2, s[i + 1] + 1);
-        ctx.lineTo(s[i + 2] + 1.2, s[i + 3] + 1);
-      }
-      ctx.stroke();
-    }
-    ctx.restore();
-  }
 }
 
 function elastic(t: number): number {

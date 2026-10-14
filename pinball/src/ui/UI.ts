@@ -1,6 +1,5 @@
 // DOM の UI:上の暗い帯(手持ち・速度・音・店・Debug)、下のブーストボタン、
-// タイトル・強化カード・ショップ・ゲームオーバーの各画面、トースト(短いお知らせ)、
-// 画面全体のフィルムの粒子(グレイン)。
+// タイトル・強化カード・ショップ・結果(夜明け)の各画面、トースト(短いお知らせ)。
 //
 // 見た目の約束:紙(クリーム)+インク(こげ茶)+赤。角は小さく、影は「ずらしたインク」。
 // 絵文字・色の帯・丸いピル型ボタンは使わない。
@@ -10,13 +9,16 @@ import { fmt } from '../game/JuiceManager';
 import { META } from '../game/Save';
 import { RARITY_LABEL, type UpgradeDef } from '../game/Upgrades';
 
-export interface GameOverInfo {
-  wave: number;
-  maxDamage: number;
+export interface ResultInfo {
+  score: number;
+  best: number;
+  newBest: boolean;
+  line: number;
+  /** 次のラインまであといくつだったか */
+  nextGap: number;
+  maxShot: number;
   bestCombo: number;
   coins: number;
-  /** ゲームオーバー時の敵の残り HP */
-  remain: number;
   canContinue: boolean;
 }
 
@@ -44,8 +46,8 @@ const TEMPLATE = `
     <button data-dbg="fire20">ボール 20 個 即発射</button>
     <button data-dbg="convert">全ペグを分裂&amp;爆発化</button>
     <button data-dbg="coins">コイン +10,000</button>
-    <button data-dbg="skip">次の Wave へスキップ</button>
-    <button data-dbg="heal">HP 全快</button>
+    <button data-dbg="skip">次のラインへスキップ</button>
+    <button data-dbg="shots">ショット +5</button>
     <button data-dbg="resetpass">購入状態をリセット</button>
   </div>
 
@@ -60,7 +62,7 @@ const TEMPLATE = `
     <div class="title-top">
       <div class="kicker">PHYSICS ROGUELITE PINBALL</div>
       <h1 class="logo"><span class="l1">夜窓</span><span class="l2">ピンボール</span></h1>
-      <p class="tagline">真夜中、部屋の小物たちが動き出す。<br>光の玉で、ぜんぶ弾き飛ばせ。</p>
+      <p class="tagline">夜明けまでの限られたショットで、<br>どこまでスコアを伸ばせるか。</p>
     </div>
     <div class="title-bottom">
       <ul class="legend" aria-label="ペグの種類">
@@ -72,14 +74,14 @@ const TEMPLATE = `
       </ul>
       <button class="btn paper big" data-act="start">はじめる</button>
       <button class="btn line" data-act="meta">永続強化・ショップ</button>
-      <div class="title-best">最高 WAVE <b data-best>0</b><span class="sep"></span>最大ダメージ <b data-bestdmg>0</b></div>
+      <div class="title-best">自己ベスト <b data-best>0</b><span class="sep"></span>最大ショット <b data-bestdmg>0</b></div>
     </div>
   </section>
 
   <section class="overlay cards-screen" hidden>
     <div class="sheet">
       <div class="sheet-head">
-        <span class="eyebrow" data-cards-sub>WAVE 1 クリア</span>
+        <span class="eyebrow" data-cards-sub>LINE 1 突破</span>
         <h2>強化をひとつ選ぶ</h2>
       </div>
       <div class="cards" data-cards></div>
@@ -120,16 +122,17 @@ const TEMPLATE = `
 
   <section class="overlay over-screen" hidden>
     <div class="sheet over">
-      <h2 class="over-title">やられた</h2>
-      <div class="over-big"><s data-ov="wave">WAVE 1</s></div>
-      <p class="over-sub">今夜の挑戦は終わり</p>
+      <h2 class="over-title">夜明け</h2>
+      <div class="over-big" data-ov="score">0</div>
+      <p class="over-sub" data-ov="best">自己ベスト更新!</p>
       <ul class="rows">
-        <li class="warn" data-ov="remain">あと 0 ダメージで撃破だった</li>
-        <li>最大ショット <b data-ov="dmg">0</b></li>
-        <li>最大コンボ <b data-ov="combo">0</b></li>
+        <li>越えたライン <b data-ov="line">0</b></li>
+        <li>最大ショット <b data-ov="shot">0</b> ・ 最大コンボ <b data-ov="combo">0</b></li>
         <li>獲得コイン <b data-ov="coins">0</b> 枚</li>
+        <li class="warn" data-ov="gap">あと 0 で次のラインだった</li>
       </ul>
-      <button class="btn line-ink" data-act="continue"><span class="ad-chip ink">AD</span><span><span data-cont-label>広告を見てコンティニュー</span><small>HP 全快+全ペグ誘爆(1 回だけ)</small></span></button>
+      <button class="btn line-ink" data-act="continue"><span class="ad-chip ink">AD</span><span><span data-cont-label>広告を見て夜を延長</span><small>ショット +3+全ペグ誘爆(1 回だけ)</small></span></button>
+      <button class="btn line-ink center" data-act="copy">結果をコピーする</button>
       <button class="btn ink" data-act="retry">もう一度</button>
       <button class="btn bare" data-act="to-title">タイトルへ</button>
     </div>
@@ -138,7 +141,7 @@ const TEMPLATE = `
   <div class="toast" role="status" aria-live="polite"></div>
   <div class="rotate-hint">スマホを縦にして遊んでね</div>
   <div class="tint" aria-hidden="true"></div>
-  <div class="film" aria-hidden="true"></div>
+  <div class="vignette" aria-hidden="true"></div>
 </div>`;
 
 export class UI {
@@ -155,27 +158,7 @@ export class UI {
     this.frame = root.querySelector<HTMLElement>('.frame')!;
     this.canvas = this.frame.querySelector<HTMLCanvasElement>('canvas')!;
     this.q = <T extends HTMLElement = HTMLElement>(sel: string) => this.frame.querySelector<T>(sel)!;
-    this.makeGrain();
     this.bind();
-  }
-
-  /** フィルムの粒子:小さなノイズ画像をその場で作り、CSS の背景として敷き詰める */
-  private makeGrain(): void {
-    try {
-      const c = document.createElement('canvas');
-      c.width = c.height = 128;
-      const x = c.getContext('2d')!;
-      const img = x.createImageData(128, 128);
-      for (let i = 0; i < img.data.length; i += 4) {
-        const v = Math.random() * 255;
-        img.data[i] = img.data[i + 1] = img.data[i + 2] = v;
-        img.data[i + 3] = 255;
-      }
-      x.putImageData(img, 0, 0);
-      this.frame.style.setProperty('--grain', `url(${c.toDataURL()})`);
-    } catch {
-      /* 粒子なしでも遊べる */
-    }
   }
 
   private bind(): void {
@@ -237,12 +220,28 @@ export class UI {
         case 'buy':
           this.buy(btn);
           break;
+        case 'copy':
+          this.copyResult();
+          break;
       }
     });
     // 画面外タップでショップを閉じる
     this.q('.shop-screen').addEventListener('click', (e) => {
       if (e.target === e.currentTarget) this.closeShop();
     });
+  }
+
+  /** 結果をコピー(クリック中に呼ぶ必要がある)。使えない環境ではお知らせだけ */
+  private copyResult(): void {
+    const text = this.game.resultText();
+    const done = () => this.toast('結果をコピーしました');
+    const fail = () => this.toast('この環境ではコピーできませんでした');
+    try {
+      if (navigator.clipboard) void navigator.clipboard.writeText(text).then(done, fail);
+      else fail();
+    } catch {
+      fail();
+    }
   }
 
   private buy(btn: HTMLElement): void {
@@ -306,7 +305,7 @@ export class UI {
 
   showTitle(): void {
     const d = this.game.save.data;
-    this.q('[data-best]').textContent = String(d.bestWave);
+    this.q('[data-best]').textContent = fmt(d.bestScore);
     this.q('[data-bestdmg]').textContent = fmt(d.bestDamage);
     this.q('.title-screen').hidden = false;
   }
@@ -315,8 +314,8 @@ export class UI {
     this.q('.title-screen').hidden = true;
   }
 
-  showCards(cards: UpgradeDef[], wave: number): void {
-    this.q('[data-cards-sub]').textContent = `WAVE ${wave} クリア`;
+  showCards(cards: UpgradeDef[], line: number): void {
+    this.q('[data-cards-sub]').textContent = `LINE ${line} 突破`;
     const box = this.q('[data-cards]');
     box.innerHTML = '';
     cards.forEach((def, i) => {
@@ -395,19 +394,23 @@ export class UI {
     }).join('');
   }
 
-  showGameOver(info: GameOverInfo): void {
-    this.q('[data-ov="wave"]').textContent = `WAVE ${info.wave}`;
-    this.q('[data-ov="dmg"]').textContent = fmt(info.maxDamage);
-    this.q('[data-ov="combo"]').textContent = String(info.bestCombo);
-    this.q('[data-ov="coins"]').textContent = fmt(info.coins);
-    this.q('[data-ov="remain"]').textContent = `あと ${fmt(info.remain)} ダメージで撃破だった`;
+  showResult(r: ResultInfo): void {
+    this.q('[data-ov="score"]').textContent = fmt(r.score);
+    const best = this.q('[data-ov="best"]');
+    best.textContent = r.newBest ? '自己ベスト更新!' : `自己ベスト ${fmt(r.best)} まで あと ${fmt(r.best - r.score)}`;
+    best.classList.toggle('dim', !r.newBest);
+    this.q('[data-ov="line"]').textContent = String(r.line);
+    this.q('[data-ov="shot"]').textContent = fmt(r.maxShot);
+    this.q('[data-ov="combo"]').textContent = String(r.bestCombo);
+    this.q('[data-ov="coins"]').textContent = fmt(r.coins);
+    this.q('[data-ov="gap"]').textContent = `あと ${fmt(r.nextGap)} で LINE ${r.line + 1} だった`;
     const cont = this.q<HTMLButtonElement>('[data-act="continue"]');
-    cont.hidden = !info.canContinue;
-    this.q('[data-cont-label]').textContent = this.game.money.hasPass ? 'コンティニュー(パス特典)' : '広告を見てコンティニュー';
+    cont.hidden = !r.canContinue;
+    this.q('[data-cont-label]').textContent = this.game.money.hasPass ? '夜を延長(パス特典)' : '広告を見て夜を延長';
     this.q('.over-screen').hidden = false;
   }
 
-  hideGameOver(): void {
+  hideResult(): void {
     this.q('.over-screen').hidden = true;
   }
 }

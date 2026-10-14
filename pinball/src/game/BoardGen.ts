@@ -1,9 +1,10 @@
-// 盤面(ペグの配置)を作る。Wave ごと・盤面リフレッシュごとに呼ばれる。
+// 盤面(ペグの配置)を作る。ライン突破後・盤面リフレッシュごとに呼ばれる。
 
 import { BUMPER_R, PEG_R, type PegType } from './constants';
 import type { Peg } from './Physics';
 
 export interface BoardSpec {
+  /** 難しさ(越えたライン数+1)。耐久ペグの割合に効く */
   wave: number;
   extraSplit: number;
   extraBomb: number;

@@ -5,7 +5,7 @@
    - 角はほぼ四角(2〜4px)、影はぼかさず、ずらしたインクの板で付ける
    - 色は紙・インク・クリーム白・赤だけ。赤は危険/強調のみ
    - 文字は角ばった極太ゴシック。数字は幅の広い極太体
-   - 画面全体にフィルムの粒子(グレイン)と、周辺を落とすビネット */
+   - 画面の周辺を少し暗くするビネットと、セピアの色かぶせ(粒子のノイズは使わない) */
 
 :root {
   --paper: #e6dfc3;
@@ -506,6 +506,8 @@ button:focus-visible { outline: calc(var(--u) * 2) dashed var(--red); outline-of
 .over-big { font-family: var(--num); font-size: calc(var(--u) * 48); font-weight: 900; line-height: 1; }
 .over-big s { text-decoration-color: var(--red); text-decoration-thickness: calc(var(--u) * 5); }
 .over-sub { margin: calc(var(--u) * -6) 0 0; color: var(--red); font-weight: 900; font-size: calc(var(--u) * 15); }
+.over-sub.dim { color: var(--ink); opacity: 0.7; font-size: calc(var(--u) * 13); }
+.over .btn.line-ink.center { justify-content: center; min-height: calc(var(--u) * 44); }
 .over .btn.line-ink { justify-content: flex-start; }
 
 /* ───────── 広告モック(古いテレビのような画面) ───────── */
@@ -600,37 +602,20 @@ button:focus-visible { outline: calc(var(--u) * 2) dashed var(--red); outline-of
   mix-blend-mode: multiply;
   opacity: 0.32;
 }
-.film {
+.vignette {
   position: absolute;
   inset: 0;
   z-index: 61;
   pointer-events: none;
-  overflow: hidden;
-  background: radial-gradient(ellipse at 50% 45%, transparent 52%, rgba(10, 7, 4, 0.55) 100%);
-}
-.film::before {
-  content: "";
-  position: absolute;
-  inset: -64px;
-  background-image: var(--grain, none);
-  opacity: 0.075;
-  animation: grain 0.6s steps(6) infinite;
+  background: radial-gradient(ellipse at 50% 45%, transparent 55%, rgba(10, 7, 4, 0.45) 100%);
 }
 
-@keyframes grain {
-  0% { transform: translate(0, 0); }
-  20% { transform: translate(-23px, 17px); }
-  40% { transform: translate(31px, -9px); }
-  60% { transform: translate(-12px, -29px); }
-  80% { transform: translate(19px, 25px); }
-  100% { transform: translate(0, 0); }
-}
 @keyframes fade-in { from { opacity: 0; } }
 @keyframes drop-in { from { transform: translateY(calc(var(--u) * -30)) rotate(-3deg); opacity: 0; } }
 @keyframes card-in { from { transform: translateX(calc(var(--u) * 40)) rotate(2deg); opacity: 0; } }
 @keyframes ad-bob { to { transform: rotate(4deg) translateY(calc(var(--u) * -8)); } }
 
 @media (prefers-reduced-motion: reduce) {
-  .film::before, .ad-mark { animation: none; }
+  .ad-mark { animation: none; }
   .sheet, .card { animation: none; }
 }

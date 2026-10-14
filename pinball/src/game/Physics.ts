@@ -31,7 +31,7 @@ export interface Ball {
   vx: number;
   vy: number;
   r: number;
-  /** 壁反射レリックなどで増えるダメージ倍率 */
+  /** 壁反射レリックなどで増えるスコア倍率 */
   dmgMul: number;
   alive: boolean;
   /** 軌跡(x,y を交互に並べた配列) */

@@ -1,8 +1,8 @@
 // Canvas への描画。背景(夜の部屋)は一度だけ別の Canvas に描いて使い回す。
 // ネオンの光るペグも、色ごとに一度だけ描いた「スプライト」(使い回し用の小さな絵)を貼る。
 
-import { drawEnemy, makeEnemy } from './Enemies';
-import { BOARD, COLORS, FEVER_COMBO, FONT, H, LAUNCHER, NUM_FONT, PEG_COLOR, W, type PegType } from './constants';
+import { BOARD, COLORS, FEVER_COMBO, FONT, H, LAUNCHER, NUM_FONT, PEG_COLOR, W, lineTarget, type PegType } from './constants';
+import { drawMascot } from './Mascot';
 import type { Game } from './Game';
 import { fmt, fmtMult } from './JuiceManager';
 import type { Ball, Peg } from './Physics';
@@ -19,8 +19,6 @@ export class Renderer {
   scale = 1;
   private bg: HTMLCanvasElement | null = null;
   private sprites = new Map<string, HTMLCanvasElement>();
-  /** タイトル画面で棚の上で寝ている怪獣 */
-  private sleeper = Object.assign(makeEnemy(1), { enterT: 1 });
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -265,7 +263,7 @@ export class Renderer {
     sk.line(c, -4, BOARD.top - 2, W + 4, BOARD.top - 2, 0.6);
     c.stroke();
 
-    // 上の壁:額縁(Wave)
+    // 上の壁:額縁(越えたライン数)
     c.fillStyle = '#d9d1ae';
     c.fillRect(20, 62, 104, 84);
     c.strokeStyle = INK;
@@ -297,7 +295,7 @@ export class Renderer {
       c.lineTo(468 + Math.cos(a) * 42, 112 + Math.sin(a) * 42);
     }
     c.stroke();
-    // 棚板(敵が立つ場所)
+    // 棚板(怪獣が座る場所)
     c.fillStyle = '#d1c9a5';
     c.fillRect(150, 192, 240, 12);
     c.lineWidth = 2.6;
@@ -308,7 +306,7 @@ export class Renderer {
     c.stroke();
     this.hatch(c, sk, 156, 205, 228, 6);
 
-    // 上下の暗い帯(上は DOM のメニュー、下は HP 表示の土台)
+    // 上下の暗い帯(上は DOM のメニュー、下は残りショット表示の土台)
     c.fillStyle = '#17130e';
     c.fillRect(0, 0, W, 34);
     c.fillRect(0, BOARD.bottom, W, H - BOARD.bottom);
@@ -415,8 +413,6 @@ export class Renderer {
       ctx.fillRect(-40, -40, W + 80, H + 80);
       ctx.globalAlpha = 1;
     }
-    if (g.hurtT > 0) this.drawHurt(g.hurtT);
-    j.drawCracks(ctx);
   }
 
   /** 紙のタグ(ふきだし)。badge を渡すと右上に黒い丸の数字が付く */
@@ -501,27 +497,57 @@ export class Renderer {
 
   private drawHudPanels(g: Game, t: number): void {
     const ctx = this.ctx;
-    const e = g.enemy;
-    // Wave(額縁の中)。タイトルでは最高記録
+    const title = g.state === 'title';
+    // 額縁:越えたライン数(タイトルでは最高記録)
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = INK;
     ctx.font = `900 11px ${NUM_FONT}`;
-    ctx.fillText(!e ? 'BEST' : e.boss ? 'BOSS' : 'WAVE', 72, 85);
+    ctx.fillText(title ? 'BEST LINE' : 'LINE', 72, 85);
     ctx.font = `900 40px ${NUM_FONT}`;
-    ctx.fillStyle = e?.boss ? COLORS.blood : INK;
-    ctx.fillText(String(e ? g.wave : g.save.data.bestWave), 72, 116);
+    ctx.fillText(String(title ? g.save.data.bestLine : g.line), 72, 116);
 
-    if (!e) {
-      this.drawTitleRoom(t);
+    if (title) {
+      this.drawTitleRoom(g, t);
       return;
     }
-    drawEnemy(ctx, e, 270, 192, t);
 
-    // 時計:攻撃までの残りショット数
-    const cd = e.countdown;
-    const danger = cd <= 1;
-    const a = -Math.PI / 2 + (1 - cd / e.maxCountdown) * Math.PI * 2;
+    // 合計スコア(壁の真ん中)
+    const best = g.save.data.bestScore;
+    this.tag(270, 54, 'SCORE', { size: 11, dark: true });
+    const txt = fmt(g.shownScore);
+    ctx.save();
+    ctx.translate(262, 100);
+    ctx.font = `900 46px ${NUM_FONT}`;
+    const w = ctx.measureText(txt).width;
+    const fit = Math.min(1, 200 / w);
+    const pop = 1 + g.scorePop * 0.15;
+    ctx.scale(fit * pop, fit * pop);
+    ctx.fillStyle = 'rgba(34,28,20,0.25)';
+    ctx.fillText(txt, 3, 4);
+    ctx.fillStyle = INK;
+    ctx.fillText(txt, 0, 0);
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = 1.5;
+    ctx.strokeText(txt, 0, 0);
+    ctx.restore();
+    ctx.font = `900 11px ${NUM_FONT}`;
+    if (best > 0 && g.score > best) {
+      ctx.fillStyle = COLORS.red;
+      ctx.fillText('自己ベスト更新中', 262, 140);
+    } else {
+      ctx.fillStyle = 'rgba(34,28,20,0.6)';
+      ctx.fillText(`BEST ${fmt(best)}`, 262, 140);
+    }
+
+    // 応援役の怪獣(棚の右はし)
+    drawMascot(ctx, g.mascot, 364, 192, t, false, 0.46);
+
+    // 時計:夜明けまでの残りショット
+    const left = g.shotsLeft;
+    const total = Math.max(1, g.shotsUsed + left);
+    const danger = left <= 1;
+    const a = -Math.PI / 2 + (g.shotsUsed / total) * Math.PI * 2;
     ctx.strokeStyle = danger ? COLORS.blood : INK;
     ctx.lineWidth = 2.6;
     ctx.lineCap = 'round';
@@ -535,28 +561,24 @@ export class Renderer {
     ctx.scale(pulse, pulse);
     ctx.fillStyle = danger ? COLORS.blood : INK;
     ctx.font = `900 34px ${NUM_FONT}`;
-    ctx.fillText(String(cd), 0, 3);
+    ctx.fillText(String(left), 0, 3);
     ctx.restore();
-    this.tag(468, 172, danger ? '次で攻撃' : `攻撃まで ${cd}`, { size: 11, dark: danger, rot: 0.03 });
+    this.tag(468, 172, danger ? (left === 1 ? 'ラスト 1 球' : '夜明け') : `夜明けまで ${left}`, { size: 11, dark: danger, rot: 0.03 });
 
-    // 敵の名前(黒いタグ)と HP バー
-    this.tag(270, 54, e.name, { size: 12, dark: true });
+    // 次のラインまでのバー
+    const prev = g.line > 0 ? lineTarget(g.line - 1) : 0;
+    const next = lineTarget(g.line);
+    const ratio = Math.max(0, Math.min(1, (g.shownScore - prev) / (next - prev)));
     const bx = 150;
     const bw = 240;
     const by = 208;
     ctx.fillStyle = COLORS.paper2;
     ctx.fillRect(bx, by, bw, 14);
-    const shown = Math.max(0, e.shownHp / e.maxHp);
-    const real = Math.max(0, e.hp / e.maxHp);
-    // 削られた分は赤く残してから消える
-    ctx.fillStyle = COLORS.red;
-    ctx.fillRect(bx, by, bw * shown, 14);
     ctx.fillStyle = INK;
-    ctx.fillRect(bx, by, bw * real, 14);
-    // インクの斜線で質感を出す
+    ctx.fillRect(bx, by, bw * ratio, 14);
     ctx.save();
     ctx.beginPath();
-    ctx.rect(bx, by, bw * real, 14);
+    ctx.rect(bx, by, bw * ratio, 14);
     ctx.clip();
     ctx.strokeStyle = 'rgba(243,237,216,0.12)';
     ctx.lineWidth = 1;
@@ -570,24 +592,20 @@ export class Renderer {
     ctx.strokeStyle = INK;
     ctx.lineWidth = 2.2;
     ctx.strokeRect(bx, by, bw, 14);
-    // HP の数字はバーの中に(縁取りでどちらの色の上でも読める)
-    ctx.font = `900 10px ${NUM_FONT}`;
+    ctx.font = `900 10px ${FONT}`;
     ctx.lineJoin = 'round';
     ctx.lineWidth = 3;
     ctx.strokeStyle = INK;
-    const hpText = `${fmt(Math.max(0, e.hp))} / ${fmt(e.maxHp)}`;
-    ctx.strokeText(hpText, 270, by + 7.5);
+    const nt = `次のライン ${fmt(next)}`;
+    ctx.strokeText(nt, 270, by + 7.5);
     ctx.fillStyle = CREAM;
-    ctx.fillText(hpText, 270, by + 7.5);
-    // 攻撃力は時計の下に
-    ctx.fillStyle = INK;
-    ctx.fillText(`威力 ${e.atk}`, 468, 197);
+    ctx.fillText(nt, 270, by + 7.5);
   }
 
   /** タイトル画面:寝ている怪獣と、今の時刻を指す時計 */
-  private drawTitleRoom(t: number): void {
+  private drawTitleRoom(g: Game, t: number): void {
     const ctx = this.ctx;
-    drawEnemy(ctx, this.sleeper, 270, 192, t * 0.5, true);
+    drawMascot(ctx, g.mascot, 270, 192, t * 0.5, true);
     ctx.save();
     ctx.fillStyle = INK;
     for (let i = 0; i < 3; i++) {
@@ -641,7 +659,7 @@ export class Renderer {
     ctx.strokeText(txt, 0, 0);
     ctx.font = `800 12px ${FONT}`;
     ctx.fillStyle = 'rgba(243,237,216,0.7)';
-    ctx.fillText('今回のダメージ', 0, size * 0.62);
+    ctx.fillText('今回のスコア', 0, size * 0.62);
     ctx.restore();
   }
 
@@ -866,7 +884,7 @@ export class Renderer {
     const p = Math.min(1, r.t / r.dur);
     const e = easeInOut(p);
     const x = 270;
-    const y = 312 + (130 - 312) * e - Math.sin(p * Math.PI) * 40;
+    const y = 312 + (100 - 312) * e - Math.sin(p * Math.PI) * 40;
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
     const rad = 14 + Math.min(26, Math.log10(r.amount + 1) * 4);
@@ -914,6 +932,9 @@ export class Renderer {
       ctx.lineWidth = 1;
       ctx.strokeRect(-w / 2 + 7, -h / 2 + 7, w - 14, h - 14);
       ctx.font = `900 54px ${font}`;
+      // 長い見出しはカードに収まるよう縮める
+      const fit = Math.min(1, (w - 44) / ctx.measureText(b.text).width);
+      ctx.font = `900 ${Math.floor(54 * fit)}px ${font}`;
       ctx.fillStyle = INK;
       ctx.fillText(b.text, 0, -16);
       ctx.strokeStyle = INK;
@@ -966,54 +987,39 @@ export class Renderer {
     ctx.restore();
   }
 
-  /** 下の暗い帯:あなたの HP(目盛り)とボール数 */
+  /** 下の暗い帯:残りショット(目盛り)とボール数 */
   private drawBottom(g: Game): void {
     const ctx = this.ctx;
-    const ratio = Math.max(0, g.hp / g.stats.maxHp);
     const y = 928;
+    const left = g.shotsLeft;
     ctx.textBaseline = 'middle';
     ctx.textAlign = 'left';
     ctx.font = `900 11px ${NUM_FONT}`;
     ctx.fillStyle = 'rgba(243,237,216,0.7)';
-    ctx.fillText('HP', 16, y);
-    const segs = 12;
-    const sw = 11;
-    const low = ratio < 0.3;
-    for (let i = 0; i < segs; i++) {
-      const filled = (i + 0.5) / segs <= ratio || (i === 0 && ratio > 0);
-      const x = 40 + i * (sw + 2);
-      if (filled) {
+    ctx.fillText('SHOT', 16, y);
+    const low = left <= 2;
+    const shown = Math.min(left, 16);
+    for (let i = 0; i < 16; i++) {
+      const x = 58 + i * 10;
+      ctx.beginPath();
+      ctx.arc(x, y, 3.6, 0, Math.PI * 2);
+      if (i < shown) {
         ctx.fillStyle = low ? COLORS.red : CREAM;
-        ctx.fillRect(x, y - 6, sw, 12);
+        ctx.fill();
       } else {
-        ctx.strokeStyle = 'rgba(243,237,216,0.3)';
+        ctx.strokeStyle = 'rgba(243,237,216,0.22)';
         ctx.lineWidth = 1;
-        ctx.strokeRect(x + 0.5, y - 5.5, sw - 1, 11);
+        ctx.stroke();
       }
     }
     ctx.font = `900 13px ${NUM_FONT}`;
     ctx.fillStyle = low ? COLORS.red : CREAM;
-    ctx.fillText(`${Math.max(0, Math.ceil(g.hp))}`, 40 + segs * (sw + 2) + 6, y);
-    const hpW = ctx.measureText(`${Math.max(0, Math.ceil(g.hp))}`).width;
-    ctx.font = `900 10px ${NUM_FONT}`;
-    ctx.fillStyle = 'rgba(243,237,216,0.5)';
-    ctx.fillText(`/ ${g.stats.maxHp}`, 40 + segs * (sw + 2) + 10 + hpW, y + 1);
+    ctx.fillText(left > 16 ? `${left} (+${left - 16})` : String(left), 58 + 16 * 10 + 2, y);
     const n = g.stats.ballsPerShot * (g.boostArmed ? 2 : 1);
     ctx.font = `800 11px ${FONT}`;
     ctx.fillStyle = 'rgba(243,237,216,0.6)';
     const alive = g.state === 'shoot' ? ` ・ 盤面に ${g.balls.length} 個` : '';
     ctx.fillText(`1 ショット ${n} 球${alive}`, 16, y + 20);
-  }
-
-  private drawHurt(t: number): void {
-    const ctx = this.ctx;
-    ctx.save();
-    const gr = ctx.createRadialGradient(W / 2, H / 2, H * 0.25, W / 2, H / 2, H * 0.7);
-    gr.addColorStop(0, 'rgba(200,57,43,0)');
-    gr.addColorStop(1, `rgba(200,57,43,${0.45 * t})`);
-    ctx.fillStyle = gr;
-    ctx.fillRect(0, 0, W, H);
-    ctx.restore();
   }
 }
 

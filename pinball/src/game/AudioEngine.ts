@@ -289,7 +289,8 @@ export class AudioEngine {
     [523, 659, 784, 1046].forEach((f, i) => this.tone('triangle', f, t + i * 0.03, 0.6, 0.07));
   }
 
-  enemyHit(power = 1): void {
+  /** スコアが合計に入るときのドスン */
+  scoreHit(power = 1): void {
     if (!this.gate('ehit', 0.05)) return;
     const t = this.now();
     const v = Math.min(1, 0.5 + power * 0.12);
@@ -298,14 +299,8 @@ export class AudioEngine {
     this.tone('sine', 60, t, 0.35, 0.4 * v, { to: 30 });
   }
 
-  enemyAttack(): void {
-    const t = this.now();
-    this.tone('sawtooth', 95, t, 0.55, 0.3, { to: 42, filter: { type: 'lowpass', freq: 700 } });
-    this.tone('sawtooth', 97, t, 0.55, 0.2, { to: 44, detune: 30, filter: { type: 'lowpass', freq: 500 } });
-    this.noiseHit(t, 0.45, 0.35, { type: 'bandpass', freq: 500, q: 1.2 });
-  }
-
-  waveClear(): void {
+  /** ライン突破・自己ベストのファンファーレ */
+  fanfare(): void {
     const t = this.now();
     [523, 659, 784, 1046, 1318].forEach((f, i) =>
       this.tone('square', f, t + i * 0.085, i === 4 ? 0.7 : 0.16, 0.06, { filter: { type: 'lowpass', freq: 3200 } }),
@@ -313,7 +308,8 @@ export class AudioEngine {
     this.tone('triangle', 261, t + 0.34, 0.8, 0.12);
   }
 
-  gameOver(): void {
+  /** 夜明け(自己ベストに届かなかったとき) */
+  dawn(): void {
     const t = this.now();
     [392, 349, 311, 262, 196].forEach((f, i) => this.tone('triangle', f, t + i * 0.2, 0.5, 0.13));
   }
