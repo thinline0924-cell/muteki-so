@@ -23,25 +23,31 @@ export const MAX_BALLS = 320;
 export const FEVER_COMBO = 50;
 export const COMBO_TIMEOUT = 1.5;
 
+// 色:セピアの紙とインク+差し色の赤。ペグの色も彩度を落として同じ世界に置く
 export const COLORS = {
-  wall: '#b0ab72',
-  wallDark: '#9b9760',
-  wallLight: '#c9c48b',
-  light: '#e9e4a6',
-  paper: '#efe9bd',
-  ink: '#3a2a1c',
-  inkSoft: 'rgba(58,42,28,0.55)',
-  night: '#24180f',
-  night2: '#3a2819',
-  chalk: '#f2ead0',
-  blood: '#d8423a',
-  normal: '#fff0cc',
-  split: '#44f2ff',
-  bomb: '#ff3b4e',
-  multi: '#ffe14a',
-  lightning: '#b86bff',
-  ball: '#fff8e2',
+  wall: '#c4bc98',
+  wallDark: '#aaa27e',
+  paper: '#e6dfc3',
+  paper2: '#d6ceac',
+  ink: '#221c14',
+  inkSoft: 'rgba(34,28,20,0.55)',
+  night: '#1c1813',
+  night2: '#2a231a',
+  cream: '#f3edd8',
+  blood: '#c8392b',
+  red: '#d9442f',
+  normal: '#d8cfae',
+  split: '#8fd6cf',
+  bomb: '#de5440',
+  multi: '#e6c25a',
+  lightning: '#ab95d6',
+  ball: '#ffffff',
 } as const;
+
+/** 文字:角ばった極太ゴシック(各端末に入っている書体だけを使う) */
+export const FONT = `"Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Noto Sans CJK JP", "Yu Gothic", "Meiryo", sans-serif`;
+/** 数字:幅の広い極太体 */
+export const NUM_FONT = `"Arial Black", "Helvetica Neue", "Roboto", "Hiragino Sans", "Noto Sans JP", sans-serif`;
 
 export type PegType = 'normal' | 'split' | 'bomb' | 'multi' | 'lightning';
 

@@ -1,5 +1,9 @@
-// DOM の UI:上部バー(コイン・速度・音・ショップ・Debug)、下部のブーストボタン、
-// タイトル・強化カード・ショップ・ゲームオーバーの各画面、トースト(短いお知らせ)。
+// DOM の UI:上の暗い帯(手持ち・速度・音・店・Debug)、下のブーストボタン、
+// タイトル・強化カード・ショップ・ゲームオーバーの各画面、トースト(短いお知らせ)、
+// 画面全体のフィルムの粒子(グレイン)。
+//
+// 見た目の約束:紙(クリーム)+インク(こげ茶)+赤。角は小さく、影は「ずらしたインク」。
+// 絵文字・色の帯・丸いピル型ボタンは使わない。
 
 import type { DebugAction, Game } from '../game/Game';
 import { fmt } from '../game/JuiceManager';
@@ -11,6 +15,8 @@ export interface GameOverInfo {
   maxDamage: number;
   bestCombo: number;
   coins: number;
+  /** ゲームオーバー時の敵の残り HP */
+  remain: number;
   canContinue: boolean;
 }
 
@@ -18,113 +24,121 @@ const TEMPLATE = `
 <div class="frame">
   <canvas class="screen" aria-label="ゲーム画面"></canvas>
 
-  <div class="hud-top">
-    <div class="coins" title="コイン"><i class="coin-ico"></i><b data-coins>0</b></div>
-    <div class="speed" role="group" aria-label="ゲームスピード">
-      <button data-speed="1">1x</button>
-      <button data-speed="2">2x<span class="lock">🔒</span></button>
-      <button data-speed="3">3x<span class="lock">🔒</span></button>
+  <header class="topbar">
+    <div class="tb-coins"><span class="tb-dim">手持ち</span><b data-coins>0</b></div>
+    <div class="tb-title">夜窓ピンボール</div>
+    <div class="tb-right">
+      <div class="speed" role="group" aria-label="ゲームスピード">
+        <button data-speed="1">1x</button>
+        <button data-speed="2">2x</button>
+        <button data-speed="3">3x</button>
+      </div>
+      <button class="tb-btn" data-act="sound" aria-label="音のオン・オフ">音</button>
+      <button class="tb-btn" data-act="shop" aria-label="ショップ">店</button>
+      <button class="tb-btn debug-btn" data-act="debug" aria-expanded="false"><span class="mono">🛠️</span>Debug</button>
     </div>
-    <button class="icon-btn" data-act="sound" aria-label="音のオン・オフ">🔊</button>
-    <button class="icon-btn" data-act="shop" aria-label="ショップ">🛒</button>
-    <button class="debug-btn" data-act="debug" aria-expanded="false">🛠️Debug</button>
-  </div>
+  </header>
 
   <div class="debug-panel" hidden>
-    <div class="debug-title">神モード <small>(テスト用)</small></div>
-    <button data-dbg="fire20">⚡ ボール20個 即発射</button>
-    <button data-dbg="convert">💥 全ペグを分裂&amp;爆発化</button>
-    <button data-dbg="coins">💰 コイン +10,000</button>
-    <button data-dbg="skip">⏭ 次の Wave へスキップ</button>
-    <button data-dbg="heal">♥ HP 全快</button>
-    <button data-dbg="resetpass">↺ 購入状態リセット</button>
+    <div class="debug-title">神モード <small>テスト用</small></div>
+    <button data-dbg="fire20">ボール 20 個 即発射</button>
+    <button data-dbg="convert">全ペグを分裂&amp;爆発化</button>
+    <button data-dbg="coins">コイン +10,000</button>
+    <button data-dbg="skip">次の Wave へスキップ</button>
+    <button data-dbg="heal">HP 全快</button>
+    <button data-dbg="resetpass">購入状態をリセット</button>
   </div>
 
   <div class="hud-bottom">
     <button class="boost-btn" data-act="boost">
-      <span class="tv">📺</span>
-      <span class="boost-text"><b>ボール 2 倍</b><small>今回のショットのみ</small></span>
+      <span class="ad-chip">AD</span>
+      <span class="boost-text"><b>×2 BALL</b><small>今回のショットだけ</small></span>
     </button>
   </div>
 
   <section class="overlay title-screen" hidden>
-    <div class="title-wrap">
-      <div class="title-kicker">PHYSICS ROGUELITE PINBALL</div>
-      <h1 class="title-logo"><span class="t1">夜窓</span><span class="t2">ピンボール</span></h1>
-      <p class="title-tag">真夜中、部屋の小物たちが動き出す。<br>光の玉で、ぜんぶ弾き飛ばせ。</p>
-      <ul class="legend">
-        <li><i style="--c:#fff0cc"></i>通常</li>
-        <li><i style="--c:#44f2ff"></i>分裂</li>
-        <li><i style="--c:#ff3b4e"></i>爆発</li>
-        <li><i style="--c:#ffe14a" class="big"></i>倍率</li>
-        <li><i style="--c:#b86bff"></i>電撃</li>
+    <div class="title-top">
+      <div class="kicker">PHYSICS ROGUELITE PINBALL</div>
+      <h1 class="logo"><span class="l1">夜窓</span><span class="l2">ピンボール</span></h1>
+      <p class="tagline">真夜中、部屋の小物たちが動き出す。<br>光の玉で、ぜんぶ弾き飛ばせ。</p>
+    </div>
+    <div class="title-bottom">
+      <ul class="legend" aria-label="ペグの種類">
+        <li><i style="--c:#d8cfae"></i>通常</li>
+        <li><i style="--c:#8fd6cf"></i>分裂</li>
+        <li><i style="--c:#de5440"></i>爆発</li>
+        <li><i style="--c:#e6c25a"></i>倍率</li>
+        <li><i style="--c:#ab95d6"></i>電撃</li>
       </ul>
-      <button class="btn primary big" data-act="start">▶ はじめる</button>
-      <button class="btn" data-act="meta">⬆ 永続強化・ショップ</button>
-      <div class="title-best">最高 WAVE <b data-best>0</b> ・ 最大ダメージ <b data-bestdmg>0</b></div>
+      <button class="btn paper big" data-act="start">はじめる</button>
+      <button class="btn line" data-act="meta">永続強化・ショップ</button>
+      <div class="title-best">最高 WAVE <b data-best>0</b><span class="sep"></span>最大ダメージ <b data-bestdmg>0</b></div>
     </div>
   </section>
 
   <section class="overlay cards-screen" hidden>
-    <div class="panel">
-      <div class="panel-head">
-        <small data-cards-sub>WAVE 1 CLEAR</small>
+    <div class="sheet">
+      <div class="sheet-head">
+        <span class="eyebrow" data-cards-sub>WAVE 1 クリア</span>
         <h2>強化をひとつ選ぶ</h2>
       </div>
       <div class="cards" data-cards></div>
-      <button class="btn ad" data-act="reroll">📺 広告を見て引き直し</button>
+      <button class="btn line-ink" data-act="reroll"><span class="ad-chip ink">AD</span><span data-reroll-label>広告を見て引き直す</span></button>
     </div>
   </section>
 
   <section class="overlay shop-screen" hidden>
-    <div class="panel">
-      <div class="panel-head">
+    <div class="sheet">
+      <div class="sheet-head">
         <h2>ショップ</h2>
-        <button class="close" data-act="close-shop" aria-label="閉じる">×</button>
+        <button class="close" data-act="close-shop" aria-label="閉じる">閉じる</button>
       </div>
       <div class="tabs" role="tablist">
-        <button data-tab="pass" role="tab">💎 パス</button>
-        <button data-tab="meta" role="tab">⬆ 永続強化</button>
+        <button data-tab="pass" role="tab">パス</button>
+        <button data-tab="meta" role="tab">永続強化</button>
       </div>
       <div class="tab-body" data-tabbody="pass">
-        <div class="pass-card">
-          <div class="ribbon">おすすめ</div>
-          <h3>広告削除+倍速解放パス</h3>
-          <div class="price">¥600 <small>買い切り</small></div>
-          <ul>
+        <div class="pass">
+          <div class="pass-head"><span class="stamp">PASS</span><h3>広告削除+倍速解放パス</h3></div>
+          <div class="price">¥600<small>買い切り</small></div>
+          <ul class="rows">
             <li>2x / 3x のゲームスピードを解放</li>
-            <li>リワード広告を見ずに報酬をすぐ受け取れる</li>
+            <li>リワード広告を見ずに、報酬をすぐ受け取れる</li>
             <li>一度買えばずっと有効</li>
           </ul>
-          <button class="btn buy" data-act="buy">¥600 で購入</button>
-          <p class="mock-note">※デモ用のモック購入です。実際の決済は行われません。</p>
+          <button class="btn ink" data-act="buy">¥600 で購入する</button>
+          <p class="note">※デモ用のモック購入です。実際の決済は行われません。</p>
         </div>
       </div>
       <div class="tab-body" data-tabbody="meta" hidden>
-        <div class="meta-coins"><i class="coin-ico"></i>所持コイン <b data-coins2>0</b></div>
+        <div class="meta-coins">手持ち <b data-coins2>0</b> 枚</div>
         <div class="meta-list" data-meta></div>
-        <p class="mock-note">永続強化は次のランから反映されます。</p>
+        <p class="note">永続強化は次のランから反映されます。</p>
       </div>
     </div>
   </section>
 
   <section class="overlay over-screen" hidden>
-    <div class="panel">
-      <h2 class="over-title">GAME OVER</h2>
-      <dl class="over-stats">
-        <div><dt>到達 WAVE</dt><dd data-ov="wave">1</dd></div>
-        <div><dt>最大ショット</dt><dd data-ov="dmg">0</dd></div>
-        <div><dt>最大コンボ</dt><dd data-ov="combo">0</dd></div>
-        <div><dt>獲得コイン</dt><dd data-ov="coins">0</dd></div>
-      </dl>
-      <button class="btn ad big" data-act="continue">📺 広告を見てコンティニュー<small>HP 全快+全ペグ誘爆(1 回だけ)</small></button>
-      <button class="btn primary" data-act="retry">もう一度</button>
-      <button class="btn" data-act="to-title">タイトルへ</button>
+    <div class="sheet over">
+      <h2 class="over-title">やられた</h2>
+      <div class="over-big"><s data-ov="wave">WAVE 1</s></div>
+      <p class="over-sub">今夜の挑戦は終わり</p>
+      <ul class="rows">
+        <li class="warn" data-ov="remain">あと 0 ダメージで撃破だった</li>
+        <li>最大ショット <b data-ov="dmg">0</b></li>
+        <li>最大コンボ <b data-ov="combo">0</b></li>
+        <li>獲得コイン <b data-ov="coins">0</b> 枚</li>
+      </ul>
+      <button class="btn line-ink" data-act="continue"><span class="ad-chip ink">AD</span><span><span data-cont-label>広告を見てコンティニュー</span><small>HP 全快+全ペグ誘爆(1 回だけ)</small></span></button>
+      <button class="btn ink" data-act="retry">もう一度</button>
+      <button class="btn bare" data-act="to-title">タイトルへ</button>
     </div>
   </section>
 
   <div class="toast" role="status" aria-live="polite"></div>
   <div class="rotate-hint">スマホを縦にして遊んでね</div>
+  <div class="tint" aria-hidden="true"></div>
+  <div class="film" aria-hidden="true"></div>
 </div>`;
 
 export class UI {
@@ -141,7 +155,27 @@ export class UI {
     this.frame = root.querySelector<HTMLElement>('.frame')!;
     this.canvas = this.frame.querySelector<HTMLCanvasElement>('canvas')!;
     this.q = <T extends HTMLElement = HTMLElement>(sel: string) => this.frame.querySelector<T>(sel)!;
+    this.makeGrain();
     this.bind();
+  }
+
+  /** フィルムの粒子:小さなノイズ画像をその場で作り、CSS の背景として敷き詰める */
+  private makeGrain(): void {
+    try {
+      const c = document.createElement('canvas');
+      c.width = c.height = 128;
+      const x = c.getContext('2d')!;
+      const img = x.createImageData(128, 128);
+      for (let i = 0; i < img.data.length; i += 4) {
+        const v = Math.random() * 255;
+        img.data[i] = img.data[i + 1] = img.data[i + 2] = v;
+        img.data[i + 3] = 255;
+      }
+      x.putImageData(img, 0, 0);
+      this.frame.style.setProperty('--grain', `url(${c.toDataURL()})`);
+    } catch {
+      /* 粒子なしでも遊べる */
+    }
   }
 
   private bind(): void {
@@ -236,11 +270,14 @@ export class UI {
         const s = Number(b.dataset.speed);
         b.classList.toggle('on', s === g.speed);
         b.classList.toggle('locked', s > 1 && !d.pass);
+        b.setAttribute('aria-label', s > 1 && !d.pass ? `${s}倍速(パスで解放)` : `${s}倍速`);
       });
     }
     if (c.muted !== d.muted) {
       c.muted = d.muted;
-      this.q('[data-act="sound"]').textContent = d.muted ? '🔇' : '🔊';
+      const b = this.q('[data-act="sound"]');
+      b.classList.toggle('off', d.muted);
+      b.setAttribute('aria-pressed', String(!d.muted));
     }
     const inRun = g.state !== 'title';
     if (c.hudVisible !== inRun) {
@@ -253,7 +290,7 @@ export class UI {
       const b = this.q<HTMLButtonElement>('.boost-btn');
       b.disabled = boost !== 'ready';
       b.classList.toggle('armed', boost === 'armed');
-      b.querySelector('b')!.textContent = boost === 'armed' ? 'BOOST ON!' : 'ボール 2 倍';
+      b.querySelector('small')!.textContent = boost === 'armed' ? '次のショットで発動' : '今回のショットだけ';
     }
   }
 
@@ -279,15 +316,14 @@ export class UI {
   }
 
   showCards(cards: UpgradeDef[], wave: number): void {
-    this.q('[data-cards-sub]').textContent = `WAVE ${wave} CLEAR!`;
+    this.q('[data-cards-sub]').textContent = `WAVE ${wave} クリア`;
     const box = this.q('[data-cards]');
     box.innerHTML = '';
     cards.forEach((def, i) => {
       const owned = this.game.owned.get(def.id) ?? 0;
       const el = document.createElement('button');
       el.className = `card r-${def.rarity}`;
-      el.style.setProperty('--c', def.color);
-      el.style.animationDelay = `${i * 0.08}s`;
+      el.style.animationDelay = `${i * 0.07}s`;
       el.innerHTML = `
         <span class="card-icon">${def.icon}</span>
         <span class="card-body">
@@ -298,8 +334,7 @@ export class UI {
       el.addEventListener('click', () => this.game.pickCard(def));
       box.appendChild(el);
     });
-    const reroll = this.q('[data-act="reroll"]');
-    reroll.textContent = this.game.money.hasPass ? '↻ 引き直し(パス特典)' : '📺 広告を見て引き直し';
+    this.q('[data-reroll-label]').textContent = this.game.money.hasPass ? '引き直す(パス特典)' : '広告を見て引き直す';
     this.q('.cards-screen').hidden = false;
   }
 
@@ -338,7 +373,7 @@ export class UI {
     btn.classList.remove('processing');
     btn.classList.toggle('owned', owned);
     btn.disabled = owned;
-    btn.textContent = owned ? '購入済み ✓ 2x / 3x 解放中' : '¥600 で購入';
+    btn.textContent = owned ? '購入済み ・ 2x / 3x 解放中' : '¥600 で購入する';
   }
 
   renderMeta(): void {
@@ -351,22 +386,24 @@ export class UI {
       return `
         <div class="meta-row">
           <span class="meta-icon">${m.icon}</span>
-          <span class="meta-info"><b>${m.name}</b><small>Lv ${lv} / ${m.max}</small><span>${m.desc}</span></span>
+          <span class="meta-info"><b>${m.name}</b><span>${m.desc}</span></span>
+          <span class="meta-lv">Lv <b>${lv}</b>/${m.max}</span>
           <button class="btn small" data-meta-buy="${m.key}" ${max || d.coins < cost ? 'disabled' : ''}>
-            ${max ? 'MAX' : `<i class="coin-ico"></i>${fmt(cost)}`}
+            ${max ? 'MAX' : `${fmt(cost)} 枚`}
           </button>
         </div>`;
     }).join('');
   }
 
   showGameOver(info: GameOverInfo): void {
-    this.q('[data-ov="wave"]').textContent = String(info.wave);
+    this.q('[data-ov="wave"]').textContent = `WAVE ${info.wave}`;
     this.q('[data-ov="dmg"]').textContent = fmt(info.maxDamage);
     this.q('[data-ov="combo"]').textContent = String(info.bestCombo);
     this.q('[data-ov="coins"]').textContent = fmt(info.coins);
+    this.q('[data-ov="remain"]').textContent = `あと ${fmt(info.remain)} ダメージで撃破だった`;
     const cont = this.q<HTMLButtonElement>('[data-act="continue"]');
     cont.hidden = !info.canContinue;
-    cont.firstChild!.textContent = this.game.money.hasPass ? '↻ コンティニュー(パス特典)' : '📺 広告を見てコンティニュー';
+    this.q('[data-cont-label]').textContent = this.game.money.hasPass ? 'コンティニュー(パス特典)' : '広告を見てコンティニュー';
     this.q('.over-screen').hidden = false;
   }
 

@@ -134,8 +134,8 @@ export function drawEnemy(ctx: CanvasRenderingContext2D, e: Enemy, x: number, y:
   ctx.lineCap = 'round';
   ctx.strokeStyle = INK;
   const flash = e.hitT > 0.55;
-  const paper = flash ? '#ffffff' : '#ece5b5';
-  const shade = flash ? '#ffffff' : '#d3cc94';
+  const paper = flash ? '#ffffff' : '#e6dfc3';
+  const shade = flash ? '#ffffff' : '#cbc29e';
   const angry = e.countdown <= 1 && e.deathT <= 0;
 
   // 影
@@ -252,7 +252,7 @@ export function drawEnemy(ctx: CanvasRenderingContext2D, e: Enemy, x: number, y:
       ctx.ellipse(0, -88, 42, 9, 0, 0, Math.PI * 2);
       fs(ctx, '#2a1c12');
       // 光る目
-      ctx.fillStyle = angry ? COLORS.blood : '#ffe14a';
+      ctx.fillStyle = angry ? COLORS.blood : COLORS.cream;
       ctx.shadowColor = ctx.fillStyle;
       ctx.shadowBlur = 10;
       ctx.beginPath();
@@ -343,9 +343,9 @@ export function drawEnemy(ctx: CanvasRenderingContext2D, e: Enemy, x: number, y:
       fs(ctx, paper);
       ctx.beginPath();
       ctx.roundRect(-42, -100, 84, 74, 4);
-      fs(ctx, '#24180f');
+      fs(ctx, COLORS.night);
       // 画面の中の顔(ネオン)
-      const c = angry ? COLORS.blood : '#9dffcf';
+      const c = angry ? COLORS.blood : COLORS.cream;
       ctx.save();
       ctx.strokeStyle = c;
       ctx.shadowColor = c;

@@ -1,9 +1,11 @@
 // JuiceManager:爽快感(ゲームジュース)の司令塔。
 // 衝突のたびに Game から呼ばれ、音・ヒットストップ・スロー・カメラシェイク・
-// ネオン火花・飛び出す文字・フィーバーをまとめて起こす。
+// 火花・飛び出す文字・ガラスのヒビ・フィーバーをまとめて起こす。
+//
+// 見た目の約束:文字はクリーム白の極太+インクの縁取り。赤は「危ない・大きい」ときだけ。
 
 import type { AudioEngine } from './AudioEngine';
-import { COMBO_TIMEOUT, FEVER_COMBO, W } from './constants';
+import { COLORS, COMBO_TIMEOUT, FEVER_COMBO, FONT, NUM_FONT, W } from './constants';
 
 interface Particle {
   x: number;
@@ -18,6 +20,9 @@ interface Particle {
   grav: number;
 }
 
+/** pop = 小さな数字 / big = 目立つ文字 / stamp = 赤いハンコのように叩きつける文字 */
+type TextKind = 'pop' | 'big' | 'stamp';
+
 interface FloatText {
   x: number;
   y: number;
@@ -28,7 +33,9 @@ interface FloatText {
   size: number;
   life: number;
   max: number;
-  big: boolean;
+  kind: TextKind;
+  rot: number;
+  font: string;
 }
 
 interface Ring {
@@ -49,24 +56,38 @@ interface Bolt {
   color: string;
 }
 
-interface Banner {
+/** ガラスのヒビ:線分(x1,y1,x2,y2)を並べたもの */
+interface Crack {
+  segs: number[];
+  life: number;
+  max: number;
+}
+
+/** text = 白い極太文字+紙のタグ / card = 紙のカード / stamp = 赤いハンコ */
+export type BannerStyle = 'text' | 'card' | 'stamp';
+
+export interface Banner {
   text: string;
   sub: string;
   color: string;
   life: number;
   max: number;
+  style: BannerStyle;
+  rot: number;
 }
 
 const MAX_PARTICLES = 1100;
 const MAX_TEXTS = 50;
 
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
+const isAscii = (s: string) => /^[\x20-\x7E×→]*$/.test(s);
 
 export class JuiceManager {
   particles: Particle[] = [];
   texts: FloatText[] = [];
   rings: Ring[] = [];
   bolts: Bolt[] = [];
+  cracks: Crack[] = [];
   banner: Banner | null = null;
 
   combo = 0;
@@ -159,32 +180,35 @@ export class JuiceManager {
     }
   }
 
-  text(x: number, y: number, text: string, color: string, size = 22, big = false): void {
+  text(x: number, y: number, text: string, color: string, size = 22, big = false, stamp = false): void {
+    const kind: TextKind = stamp ? 'stamp' : big ? 'big' : 'pop';
     // 大きな文字が重なりすぎたら、古いものから消す
-    if (big) {
+    if (kind !== 'pop') {
       let bigCount = 0;
-      for (const t of this.texts) if (t.big) bigCount++;
-      if (bigCount >= 10) {
-        const i = this.texts.findIndex((t) => t.big);
+      for (const t of this.texts) if (t.kind !== 'pop') bigCount++;
+      if (bigCount >= 9) {
+        const i = this.texts.findIndex((t) => t.kind === 'big');
         if (i >= 0) this.texts.splice(i, 1);
       }
     }
-    if (this.lowFx && !big && this.texts.length > 20) return;
+    if (this.lowFx && kind === 'pop' && this.texts.length > 20) return;
     if (this.texts.length >= MAX_TEXTS) {
-      if (!big) return;
-      const i = this.texts.findIndex((t) => !t.big);
+      if (kind === 'pop') return;
+      const i = this.texts.findIndex((t) => t.kind === 'pop');
       if (i >= 0) this.texts.splice(i, 1);
       else this.texts.shift();
     }
-    const life = big ? 1.1 : 0.75;
+    const life = kind === 'stamp' ? 1.3 : kind === 'big' ? 1.0 : 0.7;
     this.texts.push({
       x, y,
-      vx: rand(-60, 60),
-      vy: big ? -120 : rand(-230, -160),
+      vx: kind === 'pop' ? rand(-50, 50) : 0,
+      vy: kind === 'stamp' ? 0 : kind === 'big' ? -70 : rand(-210, -150),
       text, color,
       size: Math.round(size),
       life, max: life,
-      big,
+      kind,
+      rot: kind === 'stamp' ? rand(-0.2, -0.08) : kind === 'big' ? rand(-0.1, 0.1) : 0,
+      font: isAscii(text) ? NUM_FONT : FONT,
     });
   }
 
@@ -209,8 +233,45 @@ export class JuiceManager {
     this.bolts.push({ pts, life: 0.28, max: 0.28, color });
   }
 
-  showBanner(text: string, sub: string, color: string, life = 1.4): void {
-    this.banner = { text, sub, color, life, max: life };
+  /** ガラスにヒビを入れる(敵の攻撃・ゲームオーバー) */
+  crack(x: number, y: number, size: number, life = 1.6): void {
+    const segs: number[] = [];
+    const branch = (sx: number, sy: number, ang: number, len: number, depth: number) => {
+      let cx = sx;
+      let cy = sy;
+      let a = ang;
+      let left = len;
+      while (left > 0) {
+        const step = rand(14, 30);
+        a += rand(-0.35, 0.35);
+        const nx = cx + Math.cos(a) * step;
+        const ny = cy + Math.sin(a) * step;
+        segs.push(cx, cy, nx, ny);
+        cx = nx;
+        cy = ny;
+        left -= step;
+        if (depth < 2 && Math.random() < 0.18) branch(cx, cy, a + rand(-1, 1), left * rand(0.3, 0.6), depth + 1);
+      }
+    };
+    const n = 7 + Math.floor(Math.random() * 4);
+    const a0 = Math.random() * Math.PI * 2;
+    const ringPts: number[] = [];
+    for (let i = 0; i < n; i++) {
+      const a = a0 + (i / n) * Math.PI * 2 + rand(-0.2, 0.2);
+      branch(x, y, a, size * rand(0.55, 1.1), 0);
+      const rr = size * rand(0.12, 0.2);
+      ringPts.push(x + Math.cos(a) * rr, y + Math.sin(a) * rr);
+    }
+    // 中心のまわりの細かい割れ
+    for (let i = 0; i < n; i++) {
+      const j = (i + 1) % n;
+      segs.push(ringPts[i * 2], ringPts[i * 2 + 1], ringPts[j * 2], ringPts[j * 2 + 1]);
+    }
+    this.cracks.push({ segs, life, max: life });
+  }
+
+  showBanner(text: string, sub: string, color: string, life = 1.4, style: BannerStyle = 'text'): void {
+    this.banner = { text, sub, color, life, max: life, style, rot: style === 'text' ? 0 : rand(-0.06, -0.02) };
   }
 
   // ───────── 衝突イベント ─────────
@@ -229,35 +290,35 @@ export class JuiceManager {
     const c = this.combo;
     this.burst(x, y, color, destroyed ? rand(20, 40) : 12, destroyed ? 430 : 300);
     if (crit) {
-      this.text(x, y - 14, `CRIT ${fmt(dmg)}!`, '#ff6b6b', 26, true);
+      this.text(x, y - 14, `CRIT ${fmt(dmg)}`, COLORS.red, 24, true);
       this.shake(5);
     } else {
-      this.text(x, y - 10, `+${fmt(dmg)}`, color, 17 + Math.min(10, c * 0.12));
+      this.text(x, y - 10, `+${fmt(dmg)}`, COLORS.cream, 15 + Math.min(9, c * 0.1));
     }
     this.shake(1.2 + Math.min(6, c * 0.06));
   }
 
   wall(x: number, y: number, bonus: boolean): void {
-    this.burst(x, y, '#f2ead0', 8, 220, 1.8);
-    if (bonus) this.text(x + (x < W / 2 ? 30 : -30), y, 'WALL +20%', '#9dffcf', 15);
+    this.burst(x, y, COLORS.cream, 8, 220, 1.8);
+    if (bonus) this.text(x + (x < W / 2 ? 34 : -34), y, '+20%', COLORS.cream, 14);
     this.audio.wall((x / W) * 2 - 1);
   }
 
   split(x: number, y: number, count: number): void {
-    this.burst(x, y, '#44f2ff', 34, 520, 2.8);
-    this.ring(x, y, 70, '#44f2ff', 5, 0.4);
-    this.text(x, y - 20, count > 2 ? `SPLIT ×${count}!` : 'SPLIT!', '#44f2ff', 26, true);
+    this.burst(x, y, COLORS.split, 34, 520, 2.8);
+    this.ring(x, y, 70, COLORS.split, 4, 0.4);
+    this.text(x, y - 20, count > 2 ? `SPLIT ×${count}` : 'SPLIT', COLORS.cream, 24, true);
     this.audio.split((x / W) * 2 - 1);
     this.shake(4);
   }
 
   explosion(x: number, y: number, radius: number): void {
-    this.burst(x, y, '#ff3b4e', 40, 700, 3.4);
-    this.burst(x, y, '#ffb347', 26, 480, 2.6);
-    this.ring(x, y, radius, '#ff3b4e', 10, 0.5);
-    this.ring(x, y, radius * 0.6, '#ffd36b', 5, 0.35);
-    this.text(x, y - 24, 'BOOM!', '#ff3b4e', 34, true);
-    this.flash('#ff6a4d', 0.14);
+    this.burst(x, y, COLORS.bomb, 40, 700, 3.4);
+    this.burst(x, y, COLORS.cream, 22, 480, 2.4);
+    this.ring(x, y, radius, COLORS.bomb, 8, 0.5);
+    this.ring(x, y, radius * 0.6, COLORS.cream, 3, 0.35);
+    this.text(x, y - 24, 'BOOM', COLORS.red, 32, true);
+    this.flash(COLORS.cream, 0.12);
     this.hitStop(45);
     this.shake(13);
     this.audio.bomb(radius / 90);
@@ -265,34 +326,34 @@ export class JuiceManager {
 
   multiplier(x: number, y: number, mult: number): void {
     const big = mult >= 2;
-    this.burst(x, y, '#ffe14a', big ? 40 : 28, big ? 640 : 480, 3);
-    this.ring(x, y, big ? 110 : 80, '#ffe14a', 8, 0.45);
-    this.text(x, y - 30, `×${fmtMult(mult)}!`, '#ffe14a', big ? 44 : 36, true);
+    this.burst(x, y, COLORS.multi, big ? 40 : 28, big ? 640 : 480, 3);
+    this.ring(x, y, big ? 110 : 80, COLORS.multi, 6, 0.45);
+    this.text(x, y - 30, `×${fmtMult(mult)}!`, COLORS.cream, big ? 46 : 36, true);
     this.audio.multiplier(mult);
     this.shake(big ? 10 : 6);
     if (big) {
       this.hitStop(40);
       this.slowMo(0.35, 260);
-      this.flash('#ffe14a', 0.18);
+      this.flash(COLORS.cream, 0.18);
     } else {
       this.hitStop(30);
     }
   }
 
   lightning(x: number, y: number): void {
-    this.burst(x, y, '#b86bff', 24, 480, 2.4);
-    this.ring(x, y, 60, '#d6a8ff', 4, 0.3);
-    this.text(x, y - 22, 'ZAP!', '#c993ff', 28, true);
+    this.burst(x, y, COLORS.lightning, 24, 480, 2.4);
+    this.ring(x, y, 60, COLORS.lightning, 3, 0.3);
+    this.text(x, y - 22, 'ZAP', COLORS.cream, 26, true);
     this.audio.zap((x / W) * 2 - 1);
     this.shake(5);
-    this.flash('#b86bff', 0.08);
+    this.flash(COLORS.cream, 0.06);
   }
 
   startFever(): void {
     this.fever = true;
     this.feverT = 0;
-    this.showBanner('FEVER!!', `${FEVER_COMBO} COMBO 突破 — ダメージ ×1.5`, '#ff6bd6', 1.6);
-    this.flash('#ffffff', 0.35);
+    this.showBanner('FEVER', `${FEVER_COMBO} COMBO 突破 ・ ダメージ ×1.5`, COLORS.cream, 1.6, 'text');
+    this.flash(COLORS.cream, 0.35);
     this.shake(12);
     this.audio.feverStart();
     this.audio.setFever(true);
@@ -352,10 +413,10 @@ export class JuiceManager {
         this.texts.splice(i, 1);
         continue;
       }
-      t.vy += 380 * realDt;
+      if (t.kind === 'pop') t.vy += 380 * realDt;
       t.vx *= Math.exp(-3 * realDt);
       t.x += t.vx * realDt;
-      t.y += t.vy * realDt * (t.big ? 0.5 : 1);
+      t.y += t.vy * realDt;
     }
 
     for (let i = this.rings.length - 1; i >= 0; i--) {
@@ -374,6 +435,11 @@ export class JuiceManager {
       if (this.bolts[i].life <= 0) this.bolts.splice(i, 1);
     }
 
+    for (let i = this.cracks.length - 1; i >= 0; i--) {
+      this.cracks[i].life -= realDt;
+      if (this.cracks[i].life <= 0) this.cracks.splice(i, 1);
+    }
+
     if (this.banner) {
       this.banner.life -= realDt;
       if (this.banner.life <= 0) this.banner = null;
@@ -385,6 +451,7 @@ export class JuiceManager {
     this.texts.length = 0;
     this.rings.length = 0;
     this.bolts.length = 0;
+    this.cracks.length = 0;
   }
 
   /** パーティクル・リング・稲妻(加算合成で光らせる) */
@@ -395,14 +462,11 @@ export class JuiceManager {
 
     for (const r of this.rings) {
       const a = r.life / r.max;
-      ctx.globalAlpha = a * 0.9;
+      ctx.globalAlpha = a * 0.8;
       ctx.strokeStyle = r.color;
       ctx.lineWidth = r.width * a + 1;
       ctx.beginPath();
       ctx.arc(r.x, r.y, r.r, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.globalAlpha = a * 0.25;
-      ctx.lineWidth = r.width * 3 * a + 2;
       ctx.stroke();
     }
 
@@ -421,7 +485,7 @@ export class JuiceManager {
       ctx.strokeStyle = color;
       // にじみ(数が多いときは省略して軽くする)
       if (this.particles.length < 600 && !this.lowFx) {
-        ctx.globalAlpha = a * 0.28;
+        ctx.globalAlpha = a * 0.22;
         ctx.lineWidth = 5;
         ctx.beginPath();
         for (const p of list) {
@@ -432,7 +496,7 @@ export class JuiceManager {
       }
       // 芯
       ctx.globalAlpha = a;
-      ctx.lineWidth = 2.2;
+      ctx.lineWidth = 2;
       ctx.beginPath();
       for (const p of list) {
         ctx.moveTo(p.x, p.y);
@@ -444,9 +508,9 @@ export class JuiceManager {
     for (const b of this.bolts) {
       const a = b.life / b.max;
       for (const [w, al, col] of [
-        [12, 0.25, b.color],
-        [5, 0.6, b.color],
-        [2, 1, '#ffffff'],
+        [10, 0.22, b.color],
+        [4, 0.6, b.color],
+        [1.6, 1, COLORS.cream],
       ] as Array<[number, number, string]>) {
         ctx.globalAlpha = a * al;
         ctx.lineWidth = w;
@@ -460,22 +524,22 @@ export class JuiceManager {
     ctx.restore();
   }
 
-  /** 飛び出す文字。フォント指定は大きさごとに 1 回だけにして、拡大は変形(scale)で行う(速い) */
+  /** 飛び出す文字。インクの縁取り+ずらした影で、印刷物のように見せる */
   drawTexts(ctx: CanvasRenderingContext2D): void {
     if (this.texts.length === 0) return;
     ctx.save();
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.lineJoin = 'round';
-    ctx.strokeStyle = '#1d140c';
-    // 新しい大きな文字だけ光らせる(影ぼかしは重いので数を絞る)
-    let glowLeft = 4;
     let font = '';
-    for (let i = this.texts.length - 1; i >= 0; i--) {
+    for (let i = 0; i < this.texts.length; i++) {
       const t = this.texts[i];
-      const age = 1 - t.life / t.max;
-      const pop = age < 0.25 ? 0.4 + elastic(age / 0.25) * 0.6 : 1;
-      const f = `900 ${t.size}px ${FONT}`;
+      const age = t.max - t.life;
+      let sc = 1;
+      if (t.kind === 'stamp') sc = age < 0.12 ? 1.9 - (age / 0.12) * 0.9 : 1;
+      else if (t.kind === 'big') sc = age < 0.2 ? 0.5 + elastic(age / 0.2) * 0.5 : 1;
+      else sc = age < 0.12 ? 0.6 + (age / 0.12) * 0.4 : 1;
+      const f = `900 ${t.size}px ${t.font}`;
       if (f !== font) {
         ctx.font = f;
         font = f;
@@ -483,25 +547,60 @@ export class JuiceManager {
       ctx.globalAlpha = t.life < 0.25 ? t.life / 0.25 : 1;
       ctx.save();
       ctx.translate(t.x, t.y);
-      ctx.scale(pop, pop);
-      ctx.lineWidth = Math.max(3, t.size * 0.2);
-      ctx.strokeText(t.text, 0, 0);
-      const glow = t.big && glowLeft > 0;
-      if (glow) {
-        glowLeft--;
-        ctx.shadowColor = t.color;
-        ctx.shadowBlur = 14;
+      if (t.rot) ctx.rotate(t.rot);
+      ctx.scale(sc, sc);
+      ctx.strokeStyle = COLORS.ink;
+      ctx.fillStyle = COLORS.ink;
+      if (t.kind !== 'pop') {
+        // ずらした影(版ずれのような厚み)
+        const o = t.kind === 'stamp' ? 5 : 3;
+        ctx.lineWidth = Math.max(4, t.size * 0.22);
+        ctx.strokeText(t.text, o, o);
+        ctx.fillText(t.text, o, o);
       }
+      ctx.lineWidth = Math.max(3, t.size * (t.kind === 'pop' ? 0.2 : 0.22));
+      ctx.strokeText(t.text, 0, 0);
       ctx.fillStyle = t.color;
       ctx.fillText(t.text, 0, 0);
-      if (glow) ctx.shadowBlur = 0;
+      // 細い同色の線で太らせる(端末の書体が細くても極太に見える)
+      ctx.strokeStyle = t.color;
+      ctx.lineWidth = t.kind === 'pop' ? 0.6 : 1.2;
+      ctx.strokeText(t.text, 0, 0);
       ctx.restore();
     }
     ctx.restore();
   }
-}
 
-export const FONT = `"Hiragino Maru Gothic ProN", "M PLUS Rounded 1c", "Rounded Mplus 1c", "Yu Gothic UI", "Meiryo", system-ui, sans-serif`;
+  /** ガラスのヒビ(いちばん手前に描く) */
+  drawCracks(ctx: CanvasRenderingContext2D): void {
+    if (this.cracks.length === 0) return;
+    ctx.save();
+    ctx.lineCap = 'round';
+    for (const c of this.cracks) {
+      const a = Math.min(1, (c.life / c.max) * 3);
+      const s = c.segs;
+      ctx.globalAlpha = a * 0.9;
+      ctx.strokeStyle = COLORS.ink;
+      ctx.lineWidth = 2.4;
+      ctx.beginPath();
+      for (let i = 0; i < s.length; i += 4) {
+        ctx.moveTo(s[i], s[i + 1]);
+        ctx.lineTo(s[i + 2], s[i + 3]);
+      }
+      ctx.stroke();
+      ctx.globalAlpha = a * 0.7;
+      ctx.strokeStyle = COLORS.cream;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      for (let i = 0; i < s.length; i += 4) {
+        ctx.moveTo(s[i] + 1.2, s[i + 1] + 1);
+        ctx.lineTo(s[i + 2] + 1.2, s[i + 3] + 1);
+      }
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+}
 
 function elastic(t: number): number {
   if (t <= 0) return 0;

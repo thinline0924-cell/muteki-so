@@ -9,9 +9,9 @@ export type AdPlacement = 'reroll' | 'boost' | 'continue';
 const AD_SECONDS = 2;
 
 const FAKE_ADS = [
-  { title: 'にゃんにゃん横丁', sub: 'ねこカフェ経営シミュレーション', icon: '🐈', color: '#ffb36b' },
-  { title: 'ぷかぷか金魚鉢', sub: '放置で増える癒やしアクアリウム', icon: '🐟', color: '#6bd6ff' },
-  { title: 'たこ焼き職人', sub: 'くるっと返して大阪名物をつくろう', icon: '🐙', color: '#ff7a6b' },
+  { title: 'にゃんにゃん横丁', sub: 'ねこカフェ経営シミュレーション', mark: '猫' },
+  { title: 'ぷかぷか金魚鉢', sub: '放置で増える、癒やしのアクアリウム', mark: '金' },
+  { title: 'たこ焼き職人', sub: 'くるっと返して、大阪の夜をつくろう', mark: '蛸' },
 ];
 
 const LABEL: Record<AdPlacement, string> = {
@@ -53,8 +53,8 @@ export class MonetizationManager {
     el.className = 'ad-overlay';
     el.innerHTML = `
       <div class="ad-head"><span class="ad-tag">広告</span><span class="ad-timer">広告再生中...(残り${AD_SECONDS}秒)</span></div>
-      <div class="ad-body" style="--ad:${ad.color}">
-        <div class="ad-icon">${ad.icon}</div>
+      <div class="ad-body">
+        <div class="ad-mark">${ad.mark}</div>
         <div class="ad-title">${ad.title}</div>
         <div class="ad-sub">${ad.sub}</div>
         <div class="ad-cta">今すぐプレイ</div>

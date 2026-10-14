@@ -363,7 +363,7 @@ export class Game {
     this.balls.push(b);
     this.audio.launch();
     this.launcherKick = 1;
-    this.juice.burst(b.x, b.y, '#fff0cc', 8, 260, 2);
+    this.juice.burst(b.x, b.y, COLORS.cream, 8, 260, 2);
   }
 
   private onBallPeg(b: Ball, p: Peg): void {
@@ -463,7 +463,7 @@ export class Game {
     if (n < extra) {
       // 上限に達したらボールの代わりにダメージボーナス
       this.addDamage(this.stats.baseDamage * this.stats.damageMul * 5 * (extra - n));
-      this.juice.text(p.x, p.y - 30, 'MAX BALLS → DMG!', '#44f2ff', 16);
+      this.juice.text(p.x, p.y - 30, 'MAX → DMG', COLORS.cream, 15);
     }
     this.juice.split(p.x, p.y, n + 1);
   }
@@ -544,7 +544,7 @@ export class Game {
       b.vx = (Math.random() - 0.5) * 200;
       if (b.rescues > 5) b.alive = false;
     }
-    this.juice.text(b.x, b.y - 18, 'RESCUE!', '#9dffcf', 14);
+    this.juice.text(b.x, b.y - 18, 'RESCUE!', COLORS.cream, 14);
   }
 
   private drain(b: Ball): void {
@@ -554,8 +554,8 @@ export class Game {
       b.y = DRAIN_Y - 4;
       b.vy = -1050 - Math.random() * 150;
       b.vx *= 0.6;
-      this.juice.text(b.x, DRAIN_Y - 40, 'SAFETY NET!', '#9dffcf', 20, true);
-      this.juice.burst(b.x, DRAIN_Y - 10, '#9dffcf', 20, 400);
+      this.juice.text(b.x, DRAIN_Y - 40, 'SAFETY', COLORS.cream, 20, true);
+      this.juice.burst(b.x, DRAIN_Y - 10, COLORS.cream, 20, 400);
       this.audio.split();
       return;
     }
@@ -570,7 +570,7 @@ export class Game {
     this.maxShotDamage = Math.max(this.maxShotDamage, amount);
     if (amount > this.save.data.bestDamage) this.save.data.bestDamage = amount;
     if (amount <= 0) {
-      this.juice.text(270, 320, 'MISS...', '#efe9bd', 28, true);
+      this.juice.text(270, 330, 'MISS', COLORS.cream, 30, true);
       this.after(0.5, () => this.enemyTurn());
       return;
     }
@@ -585,10 +585,10 @@ export class Game {
     const power = Math.log10(amount + 1);
     this.juice.shake(4 + power * 3);
     this.juice.hitStop(45);
-    this.juice.burst(270, 130, '#ffe14a', 40, 650, 3.2);
+    this.juice.burst(270, 130, COLORS.cream, 40, 650, 3.2);
     this.juice.burst(270, 130, COLORS.blood, 24, 420, 2.6);
-    this.juice.ring(270, 130, 90 + power * 10, '#ffe14a', 8, 0.45);
-    this.juice.text(270, 92, `-${fmt(amount)}`, '#ff5a4a', 30 + Math.min(24, power * 4), true);
+    this.juice.ring(270, 130, 90 + power * 10, COLORS.cream, 6, 0.45);
+    this.juice.text(270, 110, `-${fmt(amount)}`, COLORS.red, 30 + Math.min(24, power * 4), false, true);
     this.audio.enemyHit(power / 2);
     this.addCoins(Math.floor(Math.sqrt(amount) * 0.4 * this.stats.coinMul));
     if (e.hp <= 0) {
@@ -615,15 +615,23 @@ export class Game {
       this.hp -= e.atk;
       this.hurtT = 1;
       this.juice.shake(20);
-      this.juice.flash(COLORS.blood, 0.35);
+      this.juice.flash(COLORS.blood, 0.3);
       this.juice.hitStop(50);
-      this.juice.text(130, 890, `-${e.atk}`, '#ff5a4a', 32, true);
+      // 窓ガラスにヒビ+赤いハンコ文字
+      const cx = 140 + Math.random() * 260;
+      const cy = 420 + Math.random() * 300;
       e.countdown = e.maxCountdown;
       if (this.hp <= 0) {
         this.hp = 0;
-        this.after(0.7, () => this.gameOver());
+        this.juice.crack(cx, cy, 420, 3);
+        this.juice.crack(W - cx, cy - 160, 260, 3);
+        this.juice.text(270, 600, 'やられた', COLORS.red, 72, false, true);
+        this.after(1.1, () => this.gameOver());
       } else {
-        this.after(0.5, () => this.toAim());
+        this.juice.crack(cx, cy, 240);
+        this.juice.text(cx, cy, 'ヒビ!', COLORS.red, 44, false, true);
+        this.juice.text(130, 890, `-${e.atk}`, COLORS.red, 28, true);
+        this.after(0.6, () => this.toAim());
       }
     });
   }
@@ -631,7 +639,7 @@ export class Game {
   private toAim(): void {
     if (this.stats.regen > 0 && this.hp < this.stats.maxHp) {
       this.hp = Math.min(this.stats.maxHp, this.hp + this.stats.regen);
-      this.juice.text(130, 890, `+${this.stats.regen} HP`, '#9dffcf', 18);
+      this.juice.text(130, 890, `+${this.stats.regen} HP`, COLORS.cream, 18);
     }
     const normals = this.pegs.filter((p) => p.type !== 'multi');
     const alive = normals.reduce((a, p) => a + (p.alive ? 1 : 0), 0);
@@ -657,7 +665,7 @@ export class Game {
     this.pegs = generateBoard(this.boardSpec());
     this.grid.rebuild(this.pegs);
     if (announce) {
-      this.juice.showBanner('REFRESH!', '盤面が入れ替わった', '#fff0cc', 1.0);
+      this.juice.showBanner('REFRESH', '盤面が入れ替わった', COLORS.cream, 1.0);
       this.audio.card();
     }
   }
@@ -672,15 +680,15 @@ export class Game {
     this.balls.length = 0;
     this.launchQueue.length = 0;
     this.shotEvents.length = 0;
-    this.juice.burst(270, 140, '#ffe14a', 40, 760, 3.6);
-    this.juice.burst(270, 140, '#fff0cc', 40, 520, 2.6);
-    this.juice.ring(270, 140, 160, '#ffe14a', 10, 0.6);
-    this.juice.flash('#fff6d8', 0.4);
+    this.juice.burst(270, 140, COLORS.cream, 50, 760, 3.6);
+    this.juice.burst(270, 140, COLORS.multi, 24, 520, 2.6);
+    this.juice.ring(270, 140, 160, COLORS.cream, 8, 0.6);
+    this.juice.flash(COLORS.cream, 0.4);
     this.juice.shake(16);
     this.audio.waveClear();
     const coins = Math.round((20 + this.wave * 12) * this.stats.coinMul);
     this.addCoins(coins);
-    this.juice.showBanner(`WAVE ${this.wave} CLEAR!`, `+${coins} コイン`, '#ffe14a', 1.6);
+    this.juice.showBanner('撃破!', `WAVE ${this.wave} クリア ・ +${coins} 枚`, COLORS.ink, 1.6, 'card');
     this.hp = Math.min(this.stats.maxHp, this.hp + Math.round(this.stats.maxHp * 0.1));
     if (this.wave > this.save.data.bestWave) this.save.data.bestWave = this.wave;
     this.save.write();
@@ -717,7 +725,7 @@ export class Game {
     this.wave++;
     this.enemy = makeEnemy(this.wave);
     this.refreshBoard(false);
-    this.juice.showBanner(this.enemy.boss ? 'BOSS WAVE!' : `WAVE ${this.wave}`, this.enemy.name, this.enemy.boss ? '#ff5a4a' : '#fff0cc', 1.5);
+    this.juice.showBanner(this.enemy.boss ? 'BOSS' : `WAVE ${this.wave}`, this.enemy.name, this.enemy.boss ? COLORS.red : COLORS.cream, 1.5);
     this.state = 'aim';
   }
 
@@ -731,6 +739,7 @@ export class Game {
       maxDamage: this.maxShotDamage,
       bestCombo: this.juice.bestCombo,
       coins: this.runCoins,
+      remain: this.enemy ? Math.max(0, this.enemy.hp) : 0,
       canContinue: !this.continued,
     });
   }
@@ -749,8 +758,8 @@ export class Game {
   /** コンティニュー報酬:盤面のペグを発射口から近い順に全部誘爆させる */
   private detonateAll(): void {
     this.beginShot();
-    this.juice.showBanner('全ペグ誘爆!!', 'HP 全快でコンティニュー', '#ff3b4e', 1.5);
-    this.juice.flash('#ffffff', 0.5);
+    this.juice.showBanner('全ペグ誘爆', 'HP 全快でコンティニュー', COLORS.red, 1.5, 'stamp');
+    this.juice.flash(COLORS.cream, 0.5);
     const list = this.pegs
       .filter((p) => p.alive)
       .sort((a, b) => Math.hypot(a.x - LAUNCHER.x, a.y - LAUNCHER.y) - Math.hypot(b.x - LAUNCHER.x, b.y - LAUNCHER.y));
@@ -758,7 +767,7 @@ export class Game {
       if (p.type !== 'multi') p.marked = true;
       this.shotEvent(0.35 + i * 0.022, () => {
         p.marked = false;
-        this.juice.burst(p.x, p.y, '#ff7a4d', 10, 300);
+        this.juice.burst(p.x, p.y, COLORS.bomb, 10, 300);
         this.hitPeg(p, null, 'detonate');
       });
     });
@@ -784,7 +793,7 @@ export class Game {
     this.juice.endShot();
     this.juice.bestCombo = 0;
     this.refreshBoard(false);
-    this.juice.showBanner('WAVE 1', this.enemy.name, '#fff0cc', 1.4);
+    this.juice.showBanner('READY', this.enemy.name, COLORS.cream, 1.4);
     this.audio.setCalm(false);
     this.state = 'aim';
     this.ui.hideTitle();
@@ -812,8 +821,8 @@ export class Game {
     void this.money.showRewardedAd('boost').then((ok) => {
       if (ok && this.state === 'aim') {
         this.boostArmed = true;
-        this.juice.text(LAUNCHER.x, LAUNCHER.y + 70, 'BOOST ×2!', '#44f2ff', 30, true);
-        this.juice.burst(LAUNCHER.x, LAUNCHER.y + 20, '#44f2ff', 30, 400);
+        this.juice.text(LAUNCHER.x, LAUNCHER.y + 70, '×2 BALL', COLORS.cream, 30, true);
+        this.juice.burst(LAUNCHER.x, LAUNCHER.y + 20, COLORS.cream, 30, 400);
       }
     });
   }
@@ -905,7 +914,7 @@ export class Game {
           n++;
         }
         this.grid.rebuild(this.pegs);
-        this.juice.flash('#ffffff', 0.3);
+        this.juice.flash(COLORS.cream, 0.3);
         this.ui.toast(`${n} 個のペグを分裂&爆発ペグに変えました`);
         break;
       }
