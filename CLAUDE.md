@@ -23,3 +23,7 @@
 | `js/game.js` | 進行(タイトル・事件の準備・文章・選択肢・時間・セーブ・推理・対決) |
 | `js/pixel.js` | ドット絵(320×180)。`Pixel.draw / portrait / hotspots / personSpots` |
 | `js/audio.js` | Web Audio で BGM・環境音・効果音を合成。`Sound.bgm / ambient / se` |
+
+## 別プロジェクト:`pinball/`
+- `pinball/` は「夜窓ピンボール」(スマホ向け物理ローグライト・ピンボール)。Vite + TypeScript を使う**別プロジェクト**
+- そこで作業するときは `pinball/CLAUDE.md` に従う。上の「ビルドツールを入れない」は霧笛荘事件(このフォルダ直下)だけのルール
