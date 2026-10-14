@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>霧走 MUSOU ― Prototype Racing</title>
+<meta name="description" content="プロトタイプカーを操る3DCGレースゲーム。キーボードで遊べます。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Rajdhani:wght@300;400;500;600;700&family=Share+Tech+Mono&family=Shippori+Mincho+B1:wght@500;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/race.css">
+</head>
+<body>
+<div id="app">
+  <canvas id="gl"></canvas>
+  <canvas id="fx"></canvas>
+  <div id="vignette"></div>
+
+  <!-- ================= タイトル ================= -->
+  <section id="title" class="screen">
+    <div class="ver">Ver: 1.0.0</div>
+    <div class="title-block">
+      <div class="title-line"></div>
+      <h1 class="kanji"><span>霧</span><span>走</span><i class="spark s1">✦</i><i class="spark s2">✦</i><i class="spark s3">✧</i></h1>
+      <div class="red-sub">P R O T O T Y P E &nbsp;&nbsp; R A C I N G</div>
+      <div class="roman">M U S O U</div>
+      <div class="tagline">霧を裂いて、最速の一周へ。</div>
+    </div>
+    <div class="press"><span>Press Enter to Start</span></div>
+    <div class="pills">
+      <button class="pill" data-act="help">操作説明</button>
+      <button class="pill" data-act="settings">設定</button>
+      <button class="pill" data-act="credits">クレジット</button>
+    </div>
+    <div class="copy">©2026 MUSOU Project ― 実在の車両・サーキットをモチーフにした架空の作品です</div>
+  </section>
+
+  <!-- ================= メインメニュー ================= -->
+  <section id="menu" class="screen hidden">
+    <div class="menu-head"><span class="mh-en">MODE SELECT</span><span class="mh-jp">モードを選ぶ</span></div>
+    <ul class="menu-list" id="menu-list">
+      <li data-act="timeattack"><b>TIME ATTACK</b><small>ひとりで走ってベストラップを狙う。ゴーストつき</small></li>
+      <li data-act="race"><b>RACE</b><small>ライバルとスタンディングスタートで勝負</small></li>
+      <li data-act="settings"><b>SETTINGS</b><small>画質・音量・運転補助・変速</small></li>
+      <li data-act="help"><b>CONTROLS</b><small>キーボードの操作</small></li>
+      <li data-act="title"><b>TITLE</b><small>タイトルへ戻る</small></li>
+    </ul>
+    <div class="menu-foot">↑↓ 選ぶ ・ Enter 決定 ・ Esc 戻る</div>
+  </section>
+
+  <!-- ================= マシン選択 ================= -->
+  <section id="carsel" class="screen hidden">
+    <div class="sel-head"><span class="mh-en">MACHINE</span><span class="mh-jp">マシンを選ぶ</span><span class="sel-count" id="car-count"></span></div>
+    <div class="car-info glass">
+      <div class="ci-class" id="ci-class"></div>
+      <div class="ci-name" id="ci-name"></div>
+      <div class="ci-jp" id="ci-jp"></div>
+      <div class="ci-motif" id="ci-motif"></div>
+      <p class="ci-desc" id="ci-desc"></p>
+      <table class="spec" id="ci-spec"></table>
+      <div class="bars" id="ci-bars"></div>
+    </div>
+    <div class="gauge-prev glass"><div class="gp-label">INSTRUMENT</div><canvas id="gauge-prev"></canvas></div>
+    <div class="sel-arrows"><button class="arrow" id="car-prev">‹</button><button class="arrow" id="car-next">›</button></div>
+    <div class="menu-foot">← → 車を選ぶ ・ ドラッグで回す ・ Enter 決定 ・ Esc 戻る</div>
+  </section>
+
+  <!-- ================= コース選択 ================= -->
+  <section id="tracksel" class="screen hidden">
+    <div class="sel-head"><span class="mh-en">CIRCUIT</span><span class="mh-jp">コースを選ぶ</span></div>
+    <ul class="track-list" id="track-list"></ul>
+    <div class="track-info glass">
+      <canvas id="track-map"></canvas>
+      <div class="ti-name" id="ti-name"></div>
+      <div class="ti-motif" id="ti-motif"></div>
+      <p class="ti-desc" id="ti-desc"></p>
+      <table class="spec" id="ti-spec"></table>
+      <div class="race-opts" id="race-opts">
+        <label>周回数 <span class="stepper"><button data-k="laps" data-d="-1">−</button><b id="opt-laps">3</b><button data-k="laps" data-d="1">＋</button></span></label>
+        <label>ライバル <span class="stepper"><button data-k="opp" data-d="-1">−</button><b id="opt-opp">5</b><button data-k="opp" data-d="1">＋</button></span></label>
+        <label>強さ <span class="stepper"><button data-k="diff" data-d="-1">−</button><b id="opt-diff">ふつう</b><button data-k="diff" data-d="1">＋</button></span></label>
+      </div>
+    </div>
+    <div class="menu-foot">↑↓ コース ・ ← → 周回数 ・ Enter スタート ・ Esc 戻る</div>
+  </section>
+
+  <!-- ================= 読み込み ================= -->
+  <section id="loading" class="screen hidden">
+    <div class="load-box">
+      <div class="load-name" id="load-name"></div>
+      <div class="load-bar"><i id="load-fill"></i></div>
+      <div class="load-msg" id="load-msg">コースを組み立てています…</div>
+      <div class="load-tip" id="load-tip"></div>
+    </div>
+  </section>
+
+  <!-- ================= 走行中の表示 ================= -->
+  <section id="hud" class="hidden">
+    <div class="h-tl">
+      <div class="h-pos"><span id="h-pos">P1</span><small id="h-posn">/6</small></div>
+      <div class="h-lap">LAP <b id="h-lap">1</b><small id="h-lapn">/3</small></div>
+      <div class="h-mode" id="h-mode"></div>
+    </div>
+    <div class="h-tc">
+      <div class="h-time" id="h-time">0:00.000</div>
+      <div class="h-delta" id="h-delta">±0.000</div>
+      <div class="h-sectors" id="h-sectors"><span>S1 <b>—</b></span><span>S2 <b>—</b></span><span>S3 <b>—</b></span></div>
+    </div>
+    <div class="h-tr glass-dark">
+      <div class="h-row"><span>BEST</span><b id="h-best">-:--.---</b></div>
+      <div class="h-row"><span>LAST</span><b id="h-last">-:--.---</b></div>
+      <div class="h-row"><span>TOP</span><b id="h-top">0 km/h</b></div>
+      <canvas id="minimap"></canvas>
+    </div>
+    <ol class="h-board glass-dark" id="h-board"></ol>
+    <div class="h-tele glass-dark" id="h-tele">
+      <div class="tele-grid">
+        <div><div class="tl">G-FORCE</div><canvas id="t-g"></canvas><div class="tv" id="t-gv"></div></div>
+        <div><div class="tl">TYRES / LOAD / BRAKES</div><canvas id="t-tire"></canvas></div>
+      </div>
+      <div class="tl">SPEED <i class="c-w">■</i> THROTTLE <i class="c-g">■</i> BRAKE <i class="c-r">■</i> STEER <i class="c-b">■</i></div>
+      <canvas id="t-trace"></canvas>
+      <div class="tele-nums" id="t-nums"></div>
+    </div>
+    <div class="h-inputs" id="h-inputs">
+      <div class="bars"><div class="in-bar"><i id="in-thr"></i><span>THR</span></div><div class="in-bar brk"><i id="in-brk"></i><span>BRK</span></div></div>
+      <div class="in-steer"><i id="in-steer"></i></div>
+    </div>
+    <div class="h-gauge" id="h-gauge"><canvas id="gauge"></canvas></div>
+    <div class="h-assist" id="h-assist"></div>
+    <div class="h-msg" id="h-msg"></div>
+    <div class="h-lights" id="h-lights"><i></i><i></i><i></i><i></i><i></i></div>
+    <div class="h-keys">C カメラ ・ T テレメトリー ・ H 表示 ・ R 復帰 ・ Esc ポーズ</div>
+  </section>
+
+  <!-- ================= ポーズ ================= -->
+  <section id="pause" class="screen hidden">
+    <div class="pause-box glass">
+      <div class="mh-en">PAUSE</div>
+      <ul class="menu-list small" id="pause-list">
+        <li data-act="resume"><b>RESUME</b><small>つづける</small></li>
+        <li data-act="restart"><b>RESTART</b><small>はじめから</small></li>
+        <li data-act="settings"><b>SETTINGS</b><small>設定</small></li>
+        <li data-act="help"><b>CONTROLS</b><small>操作</small></li>
+        <li data-act="quit"><b>QUIT</b><small>メニューへ戻る</small></li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ================= 結果 ================= -->
+  <section id="results" class="screen hidden">
+    <div class="res-box glass">
+      <div class="mh-en" id="res-title">RESULT</div>
+      <div class="res-sub" id="res-sub"></div>
+      <table class="res-table" id="res-table"></table>
+      <div class="res-stats" id="res-stats"></div>
+      <div class="res-btns"><button class="pill dark" data-act="restart">もう一度</button><button class="pill dark" data-act="quit">メニューへ</button></div>
+    </div>
+  </section>
+
+  <!-- ================= 設定 ================= -->
+  <section id="settings" class="screen hidden overlay">
+    <div class="set-box glass">
+      <div class="mh-en">SETTINGS</div>
+      <div class="set-grid" id="set-grid"></div>
+      <div class="res-btns"><button class="pill dark" data-act="close">閉じる</button></div>
+    </div>
+  </section>
+
+  <!-- ================= 操作説明 ================= -->
+  <section id="help" class="screen hidden overlay">
+    <div class="set-box glass">
+      <div class="mh-en">CONTROLS</div>
+      <table class="keys">
+        <tr><td><kbd>↑</kbd> <kbd>W</kbd></td><td>アクセル</td><td><kbd>E</kbd> / <kbd>Q</kbd></td><td>シフトアップ / ダウン(MT時)</td></tr>
+        <tr><td><kbd>↓</kbd> <kbd>S</kbd></td><td>ブレーキ(止まって押し続けるとバック)</td><td><kbd>Space</kbd></td><td>ブースト(ERS / スクランブル)</td></tr>
+        <tr><td><kbd>←</kbd><kbd>→</kbd> <kbd>A</kbd><kbd>D</kbd></td><td>ハンドル</td><td><kbd>C</kbd></td><td>カメラ切りかえ(5種類)</td></tr>
+        <tr><td><kbd>B</kbd></td><td>うしろを見る(押している間)</td><td><kbd>T</kbd></td><td>テレメトリー(数値パネル)</td></tr>
+        <tr><td><kbd>H</kbd></td><td>表示の量を切りかえ</td><td><kbd>R</kbd></td><td>コースに戻る</td></tr>
+        <tr><td><kbd>Esc</kbd> <kbd>P</kbd></td><td>ポーズ</td><td><kbd>M</kbd></td><td>消音</td></tr>
+      </table>
+      <p class="help-note">キーボードは「押すか離すか」しかないので、ハンドルとペダルはゆっくり効くようにしてあります。
+        ステアリング補助をオンにすると、どの速度でもタイヤがいちばん粘る角度までしか切れません(タップして小刻みに当てると、さらに速く走れます)。
+        コーナーの手前の <b>300 / 200 / 100</b> 看板がブレーキの目安です。</p>
+      <div class="res-btns"><button class="pill dark" data-act="close">閉じる</button></div>
+    </div>
+  </section>
+
+  <!-- ================= クレジット ================= -->
+  <section id="credits" class="screen hidden overlay">
+    <div class="set-box glass">
+      <div class="mh-en">CREDITS</div>
+      <p class="help-note">霧走 MUSOU ― Prototype Racing<br>
+        マシン・コースは実在のものをモチーフにした架空のデザインです。実在の団体・商標とは関係ありません。<br>
+        3D描画:three.js(MIT License)<br>
+        映像・音はすべてプログラムでその場に生成しています(画像・音声ファイルは使っていません)。</p>
+      <div class="res-btns"><button class="pill dark" data-act="close">閉じる</button></div>
+    </div>
+  </section>
+
+  <div id="fade"></div>
+  <div id="err" class="hidden"></div>
+</div>
+
+<script src="js/lib/three.min.js"></script>
+<script src="js/data.js"></script>
+<script src="js/textures.js"></script>
+<script src="js/track.js"></script>
+<script src="js/physics.js"></script>
+<script src="js/ai.js"></script>
+<script src="js/carmodel.js"></script>
+<script src="js/world.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/hud.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>

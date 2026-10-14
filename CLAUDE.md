@@ -23,3 +23,11 @@
 | `js/game.js` | 進行(タイトル・事件の準備・文章・選択肢・時間・セーブ・推理・対決) |
 | `js/pixel.js` | ドット絵(320×180)。`Pixel.draw / portrait / hotspots / personSpots` |
 | `js/audio.js` | Web Audio で BGM・環境音・効果音を合成。`Sound.bgm / ambient / se` |
+
+## もうひとつのゲーム:`race/`(霧走 MUSOU ― 3D レースゲーム)
+- 推理ゲームとは別の、独立したフォルダ。上の「約束」1〜2(ビルドなし・画像/音声ファイルなし・file:// で動く)はこちらも守る
+- 3D は `race/js/lib/three.min.js`(three.js r149 の UMD 版、MIT)を同梱して使う。`import` 形式の版に替えないこと(file:// で動かなくなる)
+- 配色は霧の白・淡い青+赤(参考画像の雰囲気)。推理ゲームの「灰緑」ルールは race には当てはめない
+- 乱数を使うのは見た目(木の位置など)と AI のばらつきだけ。コースの形は `data.js` の数値から毎回同じに作られる
+- 変更したら:4コースすべてでレースを最後まで走りきれるか確かめる(ブラウザで `window.__musou.autopilot()` を呼ぶと自分の車が自動運転になる。`window.__musouFast = 8` で早送り、`window.__musouNoRender = true` で描画を止めて高速化)
+- 車の挙動(physics.js)を変えたら、ステアリング補助オンのキーボード操作で全車・全コースがスピンせず走れるかを確かめる
