@@ -509,6 +509,18 @@ button:focus-visible { outline: calc(var(--u) * 2) dashed var(--red); outline-of
 .over-sub.dim { color: var(--ink); opacity: 0.7; font-size: calc(var(--u) * 13); }
 .over .btn.line-ink.center { justify-content: center; min-height: calc(var(--u) * 44); }
 .over .btn.line-ink { justify-content: flex-start; }
+.history { margin: 0; display: grid; gap: calc(var(--u) * 6); }
+.history figcaption { font-size: calc(var(--u) * 11); font-weight: 800; opacity: 0.7; }
+.bars {
+  display: flex;
+  align-items: flex-end;
+  gap: calc(var(--u) * 3);
+  height: calc(var(--u) * 54);
+  padding: 0 calc(var(--u) * 4);
+  border-bottom: calc(var(--u) * 2) solid var(--ink);
+}
+.bars i { flex: 1; min-width: calc(var(--u) * 3); background: var(--ink); }
+.bars i.top { background: var(--red); }
 
 /* ───────── 広告モック(古いテレビのような画面) ───────── */
 .ad-overlay {

@@ -64,6 +64,10 @@ export class Game {
   shotsLeft = 10;
   shotsUsed = 0;
   readonly mascot = makeMascot();
+  /** 夜の進み具合(0 = 真夜中 → 1 = 夜明け)。空の色に使う。ゆっくり目標に近づく */
+  nightP = 0;
+  /** ショットごとのスコアの記録(結果画面のグラフ用) */
+  shotLog: number[] = [];
   pegs: Peg[] = [];
   readonly grid = new PegGrid();
   balls: Ball[] = [];
@@ -88,6 +92,10 @@ export class Game {
   private safetyLeft = 0;
   private continued = false;
   private pendingCards = 0;
+  /** このランで自己ベストを超えた演出をもう出したか */
+  private passedBest = false;
+  /** 夜明けの演出中(空を朝にする) */
+  private sunrise = false;
   private wallFxT = 0;
   private lastTime = 0;
   private frameEma = 16;
@@ -105,6 +113,12 @@ export class Game {
     this.stats = baseStats(this.save.data.meta);
     this.speed = this.save.data.pass ? Math.min(3, Math.max(1, this.save.data.speed)) : 1;
     this.audio.setMuted(this.save.data.muted);
+    // 「視差効果を減らす」設定の人には画面の揺れを弱くする
+    try {
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) this.juice.motionScale = 0.3;
+    } catch {
+      /* 判定できなければそのまま */
+    }
     this.hooks = {
       onPeg: (b, p) => this.onBallPeg(b, p),
       onWall: (b) => this.onWall(b),
@@ -233,6 +247,13 @@ export class Game {
       if (p.cooldown > 0) p.cooldown -= gdt;
     }
     updateMascot(this.mascot, realDt);
+    // 空の色:使ったショットの割合で夜が明けていく
+    const total = this.shotsUsed + this.shotsLeft;
+    const nightTarget =
+      this.state === 'title' ? 0 : this.sunrise ? 1 : total > 0 ? this.shotsUsed / total : 0;
+    const prevP = this.nightP;
+    this.nightP += (nightTarget - this.nightP) * Math.min(1, realDt * 1.2);
+    if (Math.abs(this.nightP - prevP) > 0.0005) this.audio.setDawn(this.nightP);
     // 合計スコアはカウンターのように数字を回して追いつく
     if (this.shownScore < this.score) {
       this.shownScore += Math.max(1, (this.score - this.shownScore) * Math.min(1, realDt * 5));
@@ -448,6 +469,7 @@ export class Game {
     this.dmgPop = 1;
     p.flash = 1;
     this.juice.multiplier(p.x, p.y, p.mult);
+    if (p.mult >= 2) this.buzz(18);
   }
 
   private doSplit(p: Peg, ball: Ball | null): void {
@@ -483,6 +505,7 @@ export class Game {
 
   private doBomb(x: number, y: number, radius: number): void {
     this.juice.explosion(x, y, radius);
+    this.buzz(14);
     for (const q of this.pegs) {
       if (!q.alive || q.marked) continue;
       const d = Math.hypot(q.x - x, q.y - y);
@@ -581,6 +604,7 @@ export class Game {
     const amount = Math.round(this.shotDamage);
     this.shotDamage = amount;
     this.maxShotDamage = Math.max(this.maxShotDamage, amount);
+    this.shotLog.push(amount);
     if (amount > this.save.data.bestDamage) this.save.data.bestDamage = amount;
     if (amount <= 0) {
       this.juice.text(270, 330, 'MISS', COLORS.cream, 30, true);
@@ -604,6 +628,13 @@ export class Game {
     this.audio.scoreHit(power / 3);
     this.audio.coin();
     this.addCoins(Math.floor(Math.sqrt(amount) * 0.4 * this.stats.coinMul));
+    // ランの途中で自己ベストを抜いた瞬間を一度だけ祝う
+    const best = this.save.data.bestScore;
+    if (!this.passedBest && best > 0 && this.score > best) {
+      this.passedBest = true;
+      this.juice.text(270, 470, 'ベスト超え!', COLORS.red, 52, false, true);
+      this.buzz([20, 40, 20]);
+    }
     this.checkLines();
   }
 
@@ -626,6 +657,7 @@ export class Game {
     this.juice.flash(COLORS.cream, 0.3);
     this.juice.shake(12);
     this.audio.fanfare();
+    this.buzz([30, 50, 30]);
     const coins = Math.round((20 + this.line * 12) * crossed * this.stats.coinMul);
     this.addCoins(coins);
     this.juice.showBanner(`LINE ${this.line} 突破!`, `ショット +${bonus} ・ 強化を選ぶ`, COLORS.ink, 1.5, 'card');
@@ -714,6 +746,7 @@ export class Game {
   /** ショットを使い切った:夜明け → 結果 */
   private dawn(): void {
     this.state = 'busy';
+    this.sunrise = true;
     const d = this.save.data;
     const newBest = this.score > d.bestScore;
     if (newBest) {
@@ -733,6 +766,7 @@ export class Game {
         best: d.bestScore,
         newBest,
         line: this.line,
+        history: this.shotLog.slice(),
         nextGap: lineTarget(this.line) - this.score,
         maxShot: this.maxShotDamage,
         bestCombo: this.juice.bestCombo,
@@ -748,6 +782,7 @@ export class Game {
     void this.money.showRewardedAd('continue').then((ok) => {
       if (!ok || this.state !== 'over') return;
       this.continued = true;
+      this.sunrise = false;
       this.shotsLeft += 3;
       this.ui.hideResult();
       this.detonateAll();
@@ -787,6 +822,9 @@ export class Game {
     this.shotsUsed = 0;
     this.pendingCards = 0;
     this.continued = false;
+    this.passedBest = false;
+    this.sunrise = false;
+    this.shotLog = [];
     this.runCoins = 0;
     this.maxShotDamage = 0;
     this.shotsFired = 0;
@@ -809,6 +847,7 @@ export class Game {
 
   toTitle(): void {
     this.state = 'title';
+    this.sunrise = false;
     this.balls.length = 0;
     this.timers.length = 0;
     this.shotEvents.length = 0;
@@ -881,6 +920,16 @@ export class Game {
     this.save.data.muted = !this.save.data.muted;
     this.audio.setMuted(this.save.data.muted);
     this.save.write();
+  }
+
+  /** スマホを震わせる(対応している端末だけ。音を消しているときは震わせない) */
+  private buzz(pattern: number | number[]): void {
+    if (this.save.data.muted) return;
+    try {
+      navigator.vibrate?.(pattern);
+    } catch {
+      /* 使えない環境では何もしない */
+    }
   }
 
   addCoins(n: number): void {

@@ -14,6 +14,8 @@ export interface ResultInfo {
   best: number;
   newBest: boolean;
   line: number;
+  /** ショットごとのスコア(グラフ用) */
+  history: number[];
   /** 次のラインまであといくつだったか */
   nextGap: number;
   maxShot: number;
@@ -125,6 +127,10 @@ const TEMPLATE = `
       <h2 class="over-title">夜明け</h2>
       <div class="over-big" data-ov="score">0</div>
       <p class="over-sub" data-ov="best">自己ベスト更新!</p>
+      <figure class="history">
+        <figcaption>一晩の記録(1 本が 1 ショット)</figcaption>
+        <div class="bars" data-ov="history"></div>
+      </figure>
       <ul class="rows">
         <li>越えたライン <b data-ov="line">0</b></li>
         <li>最大ショット <b data-ov="shot">0</b> ・ 最大コンボ <b data-ov="combo">0</b></li>
@@ -400,6 +406,12 @@ export class UI {
     best.textContent = r.newBest ? '自己ベスト更新!' : `自己ベスト ${fmt(r.best)} まで あと ${fmt(r.best - r.score)}`;
     best.classList.toggle('dim', !r.newBest);
     this.q('[data-ov="line"]').textContent = String(r.line);
+    // ショットごとの棒グラフ(いちばん良かったショットは赤)
+    const max = Math.max(1, ...r.history);
+    const top = r.history.indexOf(max);
+    this.q('[data-ov="history"]').innerHTML = r.history
+      .map((v, i) => `<i class="${i === top ? 'top' : ''}" style="height:${Math.max(4, (v / max) * 100).toFixed(1)}%" title="${fmt(v)}"></i>`)
+      .join('');
     this.q('[data-ov="shot"]').textContent = fmt(r.maxShot);
     this.q('[data-ov="combo"]').textContent = String(r.bestCombo);
     this.q('[data-ov="coins"]').textContent = fmt(r.coins);

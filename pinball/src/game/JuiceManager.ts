@@ -102,6 +102,8 @@ export class JuiceManager {
   time = 0;
   /** 端末が重いとき true(パーティクルや文字を減らす)。Game がフレーム時間を見て切り替える */
   lowFx = false;
+  /** 画面の揺れの強さ(視差効果を減らす設定なら小さくする) */
+  motionScale = 1;
 
   private audio: AudioEngine;
 
@@ -135,7 +137,7 @@ export class JuiceManager {
   }
 
   shake(power: number): void {
-    this.shakeAmp = Math.min(34, this.shakeAmp + power);
+    this.shakeAmp = Math.min(34, this.shakeAmp + power * this.motionScale);
     this.shakeAng = Math.random() * Math.PI * 2;
   }
 
