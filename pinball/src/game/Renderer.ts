@@ -678,41 +678,78 @@ export class Renderer {
       : danger ? (left === 1 ? 'ラスト 1 球' : '夜明け') : `夜明けまで ${left}`;
     this.tag(468, 172, label, { size: 11, dark: danger, rot: 0.03 });
 
-    // 次のラインまでのバー
+    // 次のラインまでのバー(壁いっぱいの太いバー。中に「次のライン」と「あと いくつ」)
     const prev = g.line > 0 ? lineTarget(g.line - 1) : 0;
     const next = lineTarget(g.line);
     const ratio = Math.max(0, Math.min(1, (g.shownScore - prev) / (next - prev)));
-    const bx = 150;
-    const bw = 240;
-    const by = 208;
+    const remain = Math.max(0, next - g.shownScore);
+    const close = ratio >= 0.85;
+    const bx = 24;
+    const bw = W - 48;
+    const by = 192;
+    const bh = 30;
+    // ずらしたインクの影
+    ctx.fillStyle = 'rgba(34,28,20,0.35)';
+    ctx.fillRect(bx + 3, by + 4, bw, bh);
     ctx.fillStyle = COLORS.paper2;
-    ctx.fillRect(bx, by, bw, 14);
+    ctx.fillRect(bx, by, bw, bh);
     ctx.fillStyle = INK;
-    ctx.fillRect(bx, by, bw * ratio, 14);
+    ctx.fillRect(bx, by, bw * ratio, bh);
     ctx.save();
     ctx.beginPath();
-    ctx.rect(bx, by, bw * ratio, 14);
+    ctx.rect(bx, by, bw * ratio, bh);
     ctx.clip();
     ctx.strokeStyle = 'rgba(243,237,216,0.12)';
     ctx.lineWidth = 1;
     ctx.beginPath();
-    for (let i = -14; i < bw; i += 5) {
-      ctx.moveTo(bx + i, by + 14);
-      ctx.lineTo(bx + i + 14, by);
+    for (let i = -bh; i < bw; i += 6) {
+      ctx.moveTo(bx + i, by + bh);
+      ctx.lineTo(bx + i + bh, by);
     }
     ctx.stroke();
     ctx.restore();
-    ctx.strokeStyle = INK;
-    ctx.lineWidth = 2.2;
-    ctx.strokeRect(bx, by, bw, 14);
-    ctx.font = `900 10px ${FONT}`;
+    // 4 分の 1 ごとの目盛り
+    ctx.strokeStyle = 'rgba(34,28,20,0.35)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let i = 1; i < 4; i++) {
+      const x = bx + (bw * i) / 4;
+      ctx.moveTo(x, by + bh - 6);
+      ctx.lineTo(x, by + bh);
+    }
+    ctx.stroke();
+    // 枠(もうすぐ届くときは赤く脈打つ)
+    const barPulse = close ? 0.5 + 0.5 * Math.sin(t * 8) : 0;
+    ctx.strokeStyle = close ? `rgba(200,57,43,${0.6 + barPulse * 0.4})` : INK;
+    ctx.lineWidth = close ? 3 + barPulse : 2.6;
+    ctx.strokeRect(bx, by, bw, bh);
+    // 文字:左に目標、右に残り。どちらの色の上でも読めるよう縁取り
+    const cy = by + bh / 2 + 1;
     ctx.lineJoin = 'round';
-    ctx.lineWidth = 3;
+    ctx.lineWidth = 4;
     ctx.strokeStyle = INK;
-    const nt = `次のライン ${fmt(next)}`;
-    ctx.strokeText(nt, 270, by + 7.5);
+    ctx.textAlign = 'left';
+    ctx.font = `800 12px ${FONT}`;
+    const nextLabel = '次のライン';
+    ctx.strokeText(nextLabel, bx + 12, cy);
     ctx.fillStyle = CREAM;
-    ctx.fillText(nt, 270, by + 7.5);
+    ctx.fillText(nextLabel, bx + 12, cy);
+    const lw = ctx.measureText(nextLabel).width;
+    ctx.font = `900 16px ${NUM_FONT}`;
+    ctx.strokeText(fmt(next), bx + 20 + lw, cy);
+    ctx.fillText(fmt(next), bx + 20 + lw, cy);
+    ctx.textAlign = 'right';
+    const rt = fmt(remain);
+    ctx.font = `900 16px ${NUM_FONT}`;
+    ctx.strokeText(rt, bx + bw - 12, cy);
+    ctx.fillStyle = close ? '#ff8a76' : CREAM;
+    ctx.fillText(rt, bx + bw - 12, cy);
+    const rw = ctx.measureText(rt).width;
+    ctx.font = `800 12px ${FONT}`;
+    ctx.strokeText('あと', bx + bw - 18 - rw, cy);
+    ctx.fillStyle = CREAM;
+    ctx.fillText('あと', bx + bw - 18 - rw, cy);
+    ctx.textAlign = 'center';
   }
 
   /** タイトル画面:今の時刻を指す時計 */
