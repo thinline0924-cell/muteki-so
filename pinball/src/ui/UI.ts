@@ -10,6 +10,7 @@ import { MODES, type ModeDef, type ModeId } from '../game/Modes';
 import { todayKey } from '../game/rng';
 import { META } from '../game/Save';
 import { RARITY_LABEL, type UpgradeDef } from '../game/Upgrades';
+import { Tutorial } from './Tutorial';
 
 export interface ResultInfo {
   score: number;
@@ -70,7 +71,10 @@ const TEMPLATE = `
     </h1>
     <nav class="menu" aria-label="遊び方を選ぶ">
       <div data-modes></div>
-      <button class="menu-sub" data-act="meta">強化とショップ</button>
+      <div class="menu-links">
+        <button class="menu-sub" data-act="howto">遊び方</button>
+        <button class="menu-sub" data-act="meta">強化とショップ</button>
+      </div>
     </nav>
   </section>
 
@@ -151,6 +155,7 @@ export class UI {
   private game: Game;
   private q: <T extends HTMLElement = HTMLElement>(sel: string) => T;
   private toastTimer = 0;
+  private tutorial: Tutorial;
   private cache = { coins: -1, speed: -1, pass: false, muted: false, boost: '', hudVisible: false, title: '' };
 
   constructor(root: HTMLElement, game: Game) {
@@ -159,6 +164,14 @@ export class UI {
     this.frame = root.querySelector<HTMLElement>('.frame')!;
     this.canvas = this.frame.querySelector<HTMLCanvasElement>('canvas')!;
     this.q = <T extends HTMLElement = HTMLElement>(sel: string) => this.frame.querySelector<T>(sel)!;
+    this.tutorial = new Tutorial(this.frame, {
+      getAuto: () => this.game.save.data.howto ?? 'first',
+      setAuto: (v) => {
+        this.game.save.data.howto = v;
+        this.game.save.write();
+      },
+      click: () => this.game.audio.click(),
+    });
     this.bind();
   }
 
@@ -175,7 +188,7 @@ export class UI {
       const tab = btn.dataset.tab;
       const metaKey = btn.dataset.metaBuy;
       const mode = btn.dataset.mode as ModeId | undefined;
-      if (mode) g().startMode(mode);
+      if (mode) g().chooseMode(mode);
       if (sp) g().setSpeed(Number(sp));
       if (dbg) g().debug(dbg);
       if (tab) this.setTab(tab);
@@ -192,6 +205,9 @@ export class UI {
           break;
         case 'meta':
           this.openShop('meta');
+          break;
+        case 'howto':
+          this.tutorial.open();
           break;
         case 'close-shop':
           this.closeShop();
@@ -366,7 +382,12 @@ export class UI {
   }
 
   isShopOpen(): boolean {
-    return !this.q('.shop-screen').hidden;
+    return !this.q('.shop-screen').hidden || this.tutorial.isOpen();
+  }
+
+  /** 遊び方を開く。onDone は閉じたあとに呼ぶ */
+  openHowto(onDone: (() => void) | null = null): void {
+    this.tutorial.open(onDone);
   }
 
   private setTab(tab: string): void {

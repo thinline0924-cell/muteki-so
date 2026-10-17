@@ -20,6 +20,8 @@ export interface SaveData {
   bests: Record<string, number>;
   muted: boolean;
   speed: number;
+  /** 遊び方の自動表示:first = まだ見ていない / on = 毎回 / off = 出さない */
+  howto: 'first' | 'on' | 'off';
 }
 
 const KEY = 'yorumado-pinball-v1';
@@ -34,6 +36,7 @@ const DEFAULT: SaveData = {
   bests: {},
   muted: false,
   speed: 1,
+  howto: 'first',
 };
 
 export interface MetaDef {

@@ -899,6 +899,16 @@ export class Game {
     return mode.seeded ? `daily-${todayKey()}` : mode.id;
   }
 
+  /** タイトルでモードを選んだとき。はじめての人(や表示をオンにした人)には先に遊び方を見せる */
+  chooseMode(id: ModeId): void {
+    const h = this.save.data.howto ?? 'first';
+    if (h === 'off') {
+      this.startMode(id);
+      return;
+    }
+    this.ui.openHowto(() => this.startMode(id));
+  }
+
   /** モードを選んで始める */
   startMode(id: ModeId): void {
     this.mode = getMode(id);

@@ -18,7 +18,15 @@ export class Renderer {
   scale = 1;
   private bg: HTMLCanvasElement | null = null;
   /** 窓の外の絵(星・街の線・明かり・影)。夜明けに合わせて重ね方を変える */
-  private sky: { stars: HTMLCanvasElement; city: HTMLCanvasElement; shadow: HTMLCanvasElement; lightsA: HTMLCanvasElement; lightsB: HTMLCanvasElement } | null = null;
+  private sky: {
+    stars: HTMLCanvasElement;
+    far: HTMLCanvasElement;
+    city: HTMLCanvasElement;
+    shadow: HTMLCanvasElement;
+    lightsA: HTMLCanvasElement;
+    lightsB: HTMLCanvasElement;
+    clouds: HTMLCanvasElement[];
+  } | null = null;
   private skyGrad: { key: number; g: CanvasGradient } | null = null;
   private sprites = new Map<string, HTMLCanvasElement>();
 
@@ -256,53 +264,113 @@ export class Renderer {
     return [cv, c];
   }
 
-  /** 窓の外の絵を、重ねる順に別々の透明な絵として作る */
+  /**
+   * 窓の外の絵を、重ねる順に別々の透明な絵として作る。
+   * 奥の街(低くて薄い)と手前の街(チョークの線画)の 2 層。屋上に給水塔・アンテナ・空の看板枠などの変化をつける。
+   */
   private buildSky(): NonNullable<Renderer['sky']> {
     const sk = new Sketch(9031);
     const [stars, sc] = this.layer();
-    for (let i = 0; i < 60; i++) {
-      sc.fillStyle = `rgba(243,237,216,${0.08 + sk.rnd() * 0.3})`;
-      const sz = sk.rnd() < 0.12 ? 2 : 1.2;
-      sc.fillRect(BOARD.left + sk.rnd() * (BOARD.right - BOARD.left), BOARD.top + sk.rnd() * 380, sz, sz);
+    for (let i = 0; i < 90; i++) {
+      const big = sk.rnd() < 0.1;
+      sc.fillStyle = `rgba(243,237,216,${0.06 + sk.rnd() * (big ? 0.5 : 0.28)})`;
+      const sz = big ? 2 : 1.1;
+      sc.fillRect(BOARD.left + sk.rnd() * (BOARD.right - BOARD.left), BOARD.top + sk.rnd() * 420, sz, sz);
     }
 
+    const [far, fc] = this.layer();
     const [city, c] = this.layer();
     const [shadow, hc] = this.layer();
     const [lightsA, la] = this.layer();
     const [lightsB, lb] = this.layer();
     const base = BOARD.bottom - 2;
+    const warm = 'rgba(240,214,150,0.55)';
+
+    la.fillStyle = warm;
+    lb.fillStyle = warm;
+    // ── 奥の街:低い建物がぎっしり。塗りは空より少し暗く、上の縁だけ薄い線
+    fc.fillStyle = 'rgba(14,11,8,0.55)';
+    fc.strokeStyle = 'rgba(243,237,216,0.13)';
+    fc.lineWidth = 1.2;
+    let x = BOARD.left - 6;
+    while (x < BOARD.right + 6) {
+      const w = 16 + sk.rnd() * 30;
+      const h = 60 + sk.rnd() * 110;
+      fc.fillRect(x, base - h, w, h + 4);
+      fc.beginPath();
+      fc.moveTo(x, base - h);
+      fc.lineTo(x + w, base - h);
+      fc.stroke();
+      // 遠くの小さな明かり
+      for (let yy = base - h + 8; yy < base - 6; yy += 9) {
+        for (let xx = x + 3; xx < x + w - 3; xx += 6) {
+          const r = sk.rnd();
+          if (r < 0.1) la.fillRect(xx, yy, 2, 2.5);
+          else if (r < 0.16) lb.fillRect(xx, yy, 2, 2.5);
+        }
+      }
+      x += w + 1 + sk.rnd() * 3;
+    }
+
+    // ── 手前の街:チョークの線画+屋上の変化。影(夜明け用)も同じ形で塗る
     const blds: Array<[number, number, number]> = [
       [30, 70, 120], [70, 50, 190], [118, 64, 140], [176, 40, 230], [214, 46, 160],
       [300, 54, 175], [352, 60, 120], [410, 44, 205], [452, 62, 150], [496, 30, 110],
     ];
     const tx = 262;
     const top = base - 330;
-    // 影(夜明けの光を背に黒く沈む建物)
-    hc.fillStyle = '#16110c';
-    for (const [x, w, h] of blds) hc.fillRect(x, base - h, w, h + 4);
-    hc.beginPath();
-    hc.moveTo(tx - 26, base);
-    hc.lineTo(tx - 8, top + 40);
-    hc.lineTo(tx - 16, top + 40);
-    hc.lineTo(tx - 16, top + 26);
-    hc.lineTo(tx + 16, top + 26);
-    hc.lineTo(tx + 16, top + 40);
-    hc.lineTo(tx + 8, top + 40);
-    hc.lineTo(tx + 26, base);
-    hc.closePath();
-    hc.fill();
-    hc.fillRect(84, base - 262, 26, 92);
-
-    // 街の線画(チョークのような白い線)と、ともっている窓
     c.strokeStyle = 'rgba(243,237,216,0.34)';
     c.lineWidth = 1.7;
+    hc.fillStyle = '#16110c';
+    hc.strokeStyle = '#16110c';
+    hc.lineWidth = 2;
     c.beginPath();
-    la.fillStyle = 'rgba(240,214,150,0.55)';
-    lb.fillStyle = 'rgba(240,214,150,0.55)';
-    for (const [x, w, h] of blds) {
-      sk.rect(c, x, base - h, w, h, 0.8);
-      for (let yy = base - h + 14; yy < base - 12; yy += 20) {
-        for (let xx = x + 8; xx < x + w - 8; xx += 14) {
+    hc.beginPath();
+    blds.forEach(([bx, w, h], i) => {
+      const y0 = base - h;
+      // 屋根の形:0 平ら / 1 段々 / 2 斜め
+      const roof = i % 3;
+      if (roof === 1) {
+        sk.rect(c, bx, y0, w, h, 0.8);
+        sk.rect(c, bx + w * 0.2, y0 - 16, w * 0.6, 16, 0.6);
+        hc.rect(bx, y0, w, h + 4);
+        hc.rect(bx + w * 0.2, y0 - 16, w * 0.6, 16);
+      } else if (roof === 2) {
+        sk.line(c, bx, base, bx, y0, 0.8);
+        sk.line(c, bx, y0, bx + w, y0 - 14, 0.8);
+        sk.line(c, bx + w, y0 - 14, bx + w, base, 0.8);
+        hc.moveTo(bx, base + 4);
+        hc.lineTo(bx, y0);
+        hc.lineTo(bx + w, y0 - 14);
+        hc.lineTo(bx + w, base + 4);
+        hc.closePath();
+      } else {
+        sk.rect(c, bx, y0, w, h, 0.8);
+        hc.rect(bx, y0, w, h + 4);
+      }
+      // 屋上の小物:給水塔 / アンテナ / 空の看板枠(文字は入れない)
+      const prop = (i * 7) % 4;
+      const ry = roof === 1 ? y0 - 16 : roof === 2 ? y0 - 7 : y0;
+      if (prop === 0) {
+        const cx = bx + w * 0.7;
+        sk.rect(c, cx - 7, ry - 22, 14, 12, 0.4);
+        sk.line(c, cx - 5, ry - 10, cx - 6, ry, 0.3);
+        sk.line(c, cx + 5, ry - 10, cx + 6, ry, 0.3);
+        hc.rect(cx - 7, ry - 22, 14, 22);
+      } else if (prop === 1) {
+        const cx = bx + w * 0.3;
+        sk.line(c, cx, ry, cx, ry - 30, 0.3);
+        sk.line(c, cx - 6, ry - 22, cx + 6, ry - 22, 0.3);
+        hc.rect(cx - 1, ry - 30, 2, 30);
+      } else if (prop === 2 && w > 45) {
+        sk.rect(c, bx + 6, ry - 20, w - 12, 14, 0.5);
+        sk.line(c, bx + 12, ry - 6, bx + 12, ry, 0.3);
+        sk.line(c, bx + w - 12, ry - 6, bx + w - 12, ry, 0.3);
+        hc.rect(bx + 6, ry - 20, w - 12, 14);
+      }
+      // 窓
+      for (let yy = y0 + 14; yy < base - 12; yy += 20) {
+        for (let xx = bx + 8; xx < bx + w - 8; xx += 14) {
           if (sk.rnd() < 0.4) {
             sk.rect(c, xx, yy, 5, 7, 0.3);
             const r = sk.rnd();
@@ -311,7 +379,7 @@ export class Renderer {
           }
         }
       }
-    }
+    });
     // 電波塔
     sk.line(c, tx - 26, base, tx - 8, top + 40, 0.8);
     sk.line(c, tx + 26, base, tx + 8, top + 40, 0.8);
@@ -324,25 +392,54 @@ export class Renderer {
     sk.rect(c, tx - 16, top + 26, 32, 18, 0.6);
     sk.line(c, tx, top + 26, tx, top - 20, 0.5);
     sk.rect(c, tx - 10, base - 200, 20, 14, 0.4);
-    // 縦長の看板
-    sk.rect(c, 84, base - 262, 26, 92, 0.6);
+    // 電線(建物のあいだをたるんで渡る)
+    for (const [x1, y1, x2, y2] of [[48, base - 96, 140, base - 110], [372, base - 100, 470, base - 118]]) {
+      c.moveTo(x1, y1);
+      c.quadraticCurveTo((x1 + x2) / 2, Math.max(y1, y2) + 16, x2, y2);
+    }
     c.stroke();
-    c.fillStyle = 'rgba(243,237,216,0.34)';
-    c.font = `900 17px ${FONT}`;
-    c.textAlign = 'center';
-    c.textBaseline = 'middle';
-    ['夜', '窓', '館'].forEach((ch, i) => c.fillText(ch, 97, base - 240 + i * 24));
-    // 塔のてっぺんの赤い航空灯は lightsA に(夜の間だけ点く)
-    la.fillStyle = 'rgba(217,68,47,0.8)';
-    la.beginPath();
-    la.arc(tx, top - 22, 3, 0, Math.PI * 2);
-    la.fill();
-    return { stars, city, shadow, lightsA, lightsB };
+    hc.fill();
+    hc.beginPath();
+    hc.moveTo(tx - 26, base);
+    hc.lineTo(tx - 8, top + 40);
+    hc.lineTo(tx - 16, top + 40);
+    hc.lineTo(tx - 16, top + 26);
+    hc.lineTo(tx + 16, top + 26);
+    hc.lineTo(tx + 16, top + 40);
+    hc.lineTo(tx + 8, top + 40);
+    hc.lineTo(tx + 26, base);
+    hc.closePath();
+    hc.fill();
+    hc.fillRect(tx - 1, top - 20, 2, 46);
+
+    // 雲(やわらかい楕円を重ねたもの)。横に流して使う
+    const clouds: HTMLCanvasElement[] = [];
+    for (let k = 0; k < 3; k++) {
+      const cv = document.createElement('canvas');
+      cv.width = 200;
+      cv.height = 60;
+      const x2 = cv.getContext('2d')!;
+      for (let i = 0; i < 7; i++) {
+        const cx = 30 + sk.rnd() * 140;
+        const cy = 28 + (sk.rnd() - 0.5) * 14;
+        const rx = 22 + sk.rnd() * 30;
+        const g = x2.createRadialGradient(cx, cy, 2, cx, cy, rx);
+        g.addColorStop(0, 'rgba(243,237,216,0.12)');
+        g.addColorStop(1, 'rgba(243,237,216,0)');
+        x2.fillStyle = g;
+        x2.beginPath();
+        x2.ellipse(cx, cy, rx * 1.3, rx * 0.26, 0, 0, Math.PI * 2);
+        x2.fill();
+      }
+      clouds.push(cv);
+    }
+    return { stars, far, city, shadow, lightsA, lightsB, clouds };
   }
 
   /**
    * 空:夜の進み具合 p(0 = 真夜中 → 1 = 夜明け)で色が変わる。
    * 地平線から温かい光がにじみ、星と月が消え、街の窓の明かりが順に消え、最後に太陽が昇る。
+   * 薄い雲が流れ、塔の赤い灯が点滅し、夜はときどき流れ星、夜明けには鳥が飛ぶ。
    * ペグが読めるよう、明るくなりすぎないセピアの範囲にとどめる。
    */
   private drawSky(p: number, t: number): void {
@@ -366,16 +463,50 @@ export class Renderer {
     ctx.fillRect(L, T, R - L, B - T);
 
     const sky = this.sky;
-    // 星(またたき)と月
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(L, T, R - L, B - T);
+    ctx.clip();
+    // 星(またたき)
     const starA = clamp01(1 - p * 1.4);
     if (starA > 0) {
       ctx.globalAlpha = starA * (0.85 + Math.sin(t * 1.3) * 0.15);
       ctx.drawImage(sky.stars, 0, 0, W, H);
     }
+    // 流れ星:9 秒ごとに、半分くらいの確率で 1 本
+    if (p < 0.55) {
+      const k = Math.floor(t / 9);
+      const h = hash(k);
+      const local = t - k * 9 - h * 6;
+      if (h < 0.55 && local > 0 && local < 0.7) {
+        const sx = 120 + hash(k + 1) * 300;
+        const sy = 270 + hash(k + 2) * 120;
+        const q = local / 0.7;
+        const hx = sx + q * 150;
+        const hy = sy + q * 60;
+        const lg = ctx.createLinearGradient(hx - 60, hy - 24, hx, hy);
+        lg.addColorStop(0, 'rgba(243,237,216,0)');
+        lg.addColorStop(1, `rgba(243,237,216,${0.8 * (1 - q) * (1 - p)})`);
+        ctx.globalAlpha = 1;
+        ctx.strokeStyle = lg;
+        ctx.lineWidth = 1.6;
+        ctx.beginPath();
+        ctx.moveTo(hx - 60, hy - 24);
+        ctx.lineTo(hx, hy);
+        ctx.stroke();
+      }
+    }
     const moonA = clamp01(1 - p * 1.15);
     if (moonA > 0) {
       const mx = 452 + p * 40;
       const my = 300 + p * 150;
+      // 月のまわりのかすかな光
+      const mg = ctx.createRadialGradient(mx, my, 10, mx, my, 70);
+      mg.addColorStop(0, `rgba(243,237,216,${0.1 * moonA})`);
+      mg.addColorStop(1, 'rgba(243,237,216,0)');
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = mg;
+      ctx.fillRect(mx - 70, my - 70, 140, 140);
       // 三日月:丸から、ずらした丸の部分を切り抜く
       ctx.save();
       ctx.beginPath();
@@ -404,7 +535,37 @@ export class Renderer {
       ctx.arc(330, sy, 30, 0, Math.PI * 2);
       ctx.fill();
     }
-    // 光を背にした建物の影 → 街の線 → 窓の明かり(半分ずつ消えていく)
+    // 流れる雲(夜明けには少し濃く、温かい色に見える)
+    const cloudA = 0.55 + p * 0.6;
+    for (let i = 0; i < sky.clouds.length; i++) {
+      const span = R - L + 260;
+      const cx = L - 200 + ((t * (5 + i * 3) + i * 230) % span);
+      const cy = 300 + i * 70;
+      ctx.globalAlpha = cloudA;
+      ctx.drawImage(sky.clouds[i], cx, cy - 30, 200, 60);
+    }
+    // 夜明けの鳥:7 秒ごとに 2〜3 羽が横切る
+    if (p > 0.7) {
+      const k = Math.floor(t / 7);
+      const local = (t - k * 7) / 7;
+      const n = 2 + Math.floor(hash(k) * 2);
+      ctx.globalAlpha = clamp01((p - 0.7) * 4);
+      ctx.strokeStyle = '#1a140e';
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      for (let i = 0; i < n; i++) {
+        const bx = L - 20 + local * (R - L + 40) + i * 18;
+        const by = 340 + hash(k + 3) * 120 + i * 9 + Math.sin(t * 3 + i) * 3;
+        const f = Math.sin(t * 12 + i * 2) * 3;
+        ctx.moveTo(bx - 6, by - f);
+        ctx.lineTo(bx, by);
+        ctx.lineTo(bx + 6, by - f);
+      }
+      ctx.stroke();
+    }
+    // 奥の街 → 光を背にした手前の建物の影 → 手前の線画 → 窓の明かり(半分ずつ消えていく)
+    ctx.globalAlpha = 1;
+    ctx.drawImage(sky.far, 0, 0, W, H);
     const shadowA = clamp01((p - 0.2) * 1.2);
     if (shadowA > 0) {
       ctx.globalAlpha = shadowA * 0.92;
@@ -422,8 +583,21 @@ export class Renderer {
       ctx.globalAlpha = lb;
       ctx.drawImage(sky.lightsB, 0, 0, W, H);
     }
+    // 塔のてっぺんの赤い灯(ゆっくり点滅。朝には消える)
+    const beacon = clamp01(1 - p * 1.3) * (Math.sin(t * 2.2) > 0.2 ? 1 : 0.15);
+    if (beacon > 0) {
+      const by = BOARD.bottom - 2 - 330 - 22;
+      ctx.globalAlpha = beacon;
+      const bg = ctx.createRadialGradient(262, by, 1, 262, by, 12);
+      bg.addColorStop(0, 'rgba(217,68,47,0.9)');
+      bg.addColorStop(1, 'rgba(217,68,47,0)');
+      ctx.fillStyle = bg;
+      ctx.fillRect(250, by - 12, 24, 24);
+    }
+    ctx.restore();
     ctx.globalAlpha = 1;
   }
+
 
   /** 斜線の影(ペンで描いたハッチング) */
   private hatch(c: CanvasRenderingContext2D, sk: Sketch, x: number, y: number, w: number, h: number): void {
@@ -1245,4 +1419,10 @@ function rgb(c: RGB): string {
 
 function clamp01(v: number): number {
   return v < 0 ? 0 : v > 1 ? 1 : v;
+}
+
+/** 時刻の区切り番号から、0〜1 の決まった値を作る(流れ星や鳥の出方に使う) */
+function hash(n: number): number {
+  const x = Math.sin(n * 127.1 + 311.7) * 43758.5453;
+  return x - Math.floor(x);
 }
