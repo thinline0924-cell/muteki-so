@@ -33,7 +33,7 @@ const TEMPLATE = `
 
   <header class="topbar">
     <div class="tb-coins"><span class="tb-dim">手持ち</span><b data-coins>0</b></div>
-    <div class="tb-title">夜窓ピンボール</div>
+    <div class="tb-title"></div>
     <div class="tb-right">
       <div class="speed" role="group" aria-label="ゲームスピード">
         <button data-speed="1">1x</button>
@@ -64,22 +64,14 @@ const TEMPLATE = `
   </div>
 
   <section class="overlay title-screen" hidden>
-    <div class="title-top">
-      <div class="kicker">PHYSICS ROGUELITE PINBALL</div>
-      <h1 class="logo"><span class="l1">夜窓</span><span class="l2">ピンボール</span></h1>
-      <p class="tagline">夜明けまでの限られたショットで、<br>どこまでスコアを伸ばせるか。</p>
-    </div>
-    <div class="title-bottom">
-      <ul class="legend" aria-label="ペグの種類">
-        <li><i style="--c:#d8cfae"></i>通常</li>
-        <li><i style="--c:#8fd6cf"></i>分裂</li>
-        <li><i style="--c:#de5440"></i>爆発</li>
-        <li><i style="--c:#e6c25a"></i>倍率</li>
-        <li><i style="--c:#ab95d6"></i>電撃</li>
-      </ul>
-      <div class="modes" data-modes role="list" aria-label="遊び方を選ぶ"></div>
-      <button class="btn line" data-act="meta">永続強化・ショップ</button>
-    </div>
+    <h1 class="logo" aria-label="夜窓ピンボール">
+      <span class="l1" aria-hidden="true"><i>夜</i><i>窓</i></span>
+      <span class="l2" aria-hidden="true"><i>ピ</i><i>ン</i><i>ボ</i><i class="bar">ー</i><i>ル</i></span>
+    </h1>
+    <nav class="menu" aria-label="遊び方を選ぶ">
+      <div data-modes></div>
+      <button class="menu-sub" data-act="meta">強化とショップ</button>
+    </nav>
   </section>
 
   <section class="overlay cards-screen" hidden>
@@ -291,7 +283,7 @@ export class UI {
     }
     const inRun = g.state !== 'title';
     // 上の帯の真ん中:遊んでいる間はモード名
-    const title = inRun ? g.mode.name + (g.mode.seeded ? ` ${todayKey().slice(4, 6)}/${todayKey().slice(6)}` : '') : '夜窓ピンボール';
+    const title = inRun ? g.mode.name + (g.mode.seeded ? ` ${todayKey().slice(4, 6)}/${todayKey().slice(6)}` : '') : '';
     if (c.title !== title) {
       c.title = title;
       this.q('.tb-title').textContent = title;
@@ -325,13 +317,8 @@ export class UI {
     const box = this.q('[data-modes]');
     box.innerHTML = MODES.map((m) => {
       const best = d.bests[this.game.bestKey(m)] ?? 0;
-      const day = m.seeded ? `<i class="day">${todayKey().slice(4, 6)}/${todayKey().slice(6)}</i>` : '';
-      return `
-        <button class="mode${m.id === 'night' ? ' main' : ''}" data-mode="${m.id}" role="listitem">
-          <span class="mode-name"><b>${m.name}</b>${day}</span>
-          <span class="mode-best"><small>BEST</small>${best > 0 ? fmt(best) : '—'}</span>
-          <span class="mode-desc">${m.desc}</span>
-        </button>`;
+      const day = m.seeded ? `<span class="m-day">${todayKey().slice(4, 6)}/${todayKey().slice(6)}</span>` : '';
+      return `<button class="m" data-mode="${m.id}"><span class="m-name">${m.name}</span>${day}<span class="m-best">${best > 0 ? fmt(best) : ''}</span></button>`;
     }).join('');
     this.q('.title-screen').hidden = false;
   }

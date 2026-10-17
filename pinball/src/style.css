@@ -310,7 +310,6 @@ button:focus-visible { outline: calc(var(--u) * 2) dashed var(--red); outline-of
   box-shadow: calc(var(--u) * 7) calc(var(--u) * 8) 0 var(--ink-2);
   display: grid;
   gap: calc(var(--u) * 14);
-  transform: rotate(-0.6deg);
   animation: drop-in 0.32s cubic-bezier(0.2, 1.3, 0.4, 1);
 }
 /* 内側の細い線(印刷の枠) */
@@ -343,90 +342,75 @@ button:focus-visible { outline: calc(var(--u) * 2) dashed var(--red); outline-of
 .rows .warn { color: var(--red); font-weight: 900; }
 .note { font-size: calc(var(--u) * 11.5); font-weight: 700; opacity: 0.75; margin: 0; line-height: 1.6; }
 
-/* ───────── タイトル ───────── */
+/* ───────── タイトル ─────────
+   夜の窓に、縦書きの題字と、文字だけのメニュー。飾りを足さず、空(余白)を見せる */
 .title-screen {
-  flex-direction: column;
-  justify-content: space-between;
-  padding: calc(var(--u) * 250) calc(var(--u) * 36) calc(var(--u) * 62);
-  background: linear-gradient(180deg, transparent 0%, transparent 26%, rgba(15, 12, 8, 0.35) 60%, rgba(15, 12, 8, 0.75) 100%);
-  color: var(--cream);
-  text-align: center;
-}
-.title-top, .title-bottom { width: 100%; display: grid; justify-items: center; }
-.title-bottom { gap: calc(var(--u) * 14); }
-.kicker {
-  font-family: var(--num);
-  font-size: calc(var(--u) * 11);
-  font-weight: 900;
-  letter-spacing: 0.16em;
-  border: calc(var(--u) * 1.5) solid var(--cream);
-  padding: calc(var(--u) * 5) calc(var(--u) * 10);
-}
-.logo { margin: calc(var(--u) * 14) 0 0; font-weight: 900; line-height: 0.95; }
-.logo span { display: block; }
-.logo .l1 {
-  font-size: calc(var(--u) * 92);
-  letter-spacing: 0.04em;
-  color: var(--cream);
-  -webkit-text-stroke: calc(var(--u) * 1.5) var(--cream);
-  text-shadow: 0 0 calc(var(--u) * 26) rgba(243, 237, 216, 0.55), calc(var(--u) * 5) calc(var(--u) * 6) 0 var(--ink-2);
-}
-.logo .l2 {
-  margin-top: calc(var(--u) * 6);
-  font-size: calc(var(--u) * 34);
-  letter-spacing: 0.32em;
-  padding-left: 0.32em;
-  color: var(--cream);
-  text-shadow: calc(var(--u) * 3) calc(var(--u) * 4) 0 var(--ink-2);
-}
-.tagline { margin: calc(var(--u) * 18) 0 0; font-size: calc(var(--u) * 14); line-height: 1.8; font-weight: 700; color: var(--dim); }
-.legend {
-  list-style: none;
+  display: block;
   padding: 0;
+  background: linear-gradient(180deg, transparent 0%, transparent 55%, rgba(12, 9, 6, 0.55) 72%, rgba(12, 9, 6, 0.82) 100%);
+  color: var(--cream);
+}
+.logo {
+  /* 縦書きは端末によって崩れるので、1 文字ずつ縦に積む */
+  position: absolute;
+  top: calc(var(--u) * 270);
+  right: calc(var(--u) * 104);
   margin: 0;
   display: flex;
-  justify-content: center;
-  gap: calc(var(--u) * 14);
-  font-size: calc(var(--u) * 12);
+  flex-direction: row-reverse;
+  align-items: flex-start;
+  gap: calc(var(--u) * 16);
+  font-weight: 900;
+  line-height: 1;
+}
+.logo span { display: flex; flex-direction: column; }
+.logo i { font-style: normal; display: block; text-align: center; }
+.logo .l1 i {
+  font-size: calc(var(--u) * 112);
+  -webkit-text-stroke: calc(var(--u) * 1) var(--cream);
+}
+.logo .l1 i + i { margin-top: calc(var(--u) * 4); }
+.logo .l2 {
+  margin-top: calc(var(--u) * 10);
+  gap: calc(var(--u) * 10);
+  font-size: calc(var(--u) * 16);
   font-weight: 800;
-  color: var(--dim);
+  opacity: 0.7;
 }
-.legend li { display: flex; align-items: center; gap: calc(var(--u) * 5); }
-.legend i {
-  width: calc(var(--u) * 11);
-  height: calc(var(--u) * 11);
-  border-radius: 50%;
-  background: var(--c);
-  border: calc(var(--u) * 1.5) solid var(--ink-2);
-  box-shadow: 0 0 calc(var(--u) * 8) var(--c);
+/* 縦に並べたときの長音「ー」は縦棒にする */
+.logo .l2 .bar { transform: rotate(90deg); }
+.menu {
+  position: absolute;
+  left: calc(var(--u) * 44);
+  right: calc(var(--u) * 44);
+  bottom: calc(var(--u) * 78);
 }
-.title-bottom .btn { max-width: calc(var(--u) * 400); min-height: calc(var(--u) * 44); font-size: calc(var(--u) * 15); }
-
-/* モード選び:夜の窓に浮かぶ札。一晩(基本)だけ紙の色 */
-.modes { width: 100%; max-width: calc(var(--u) * 400); display: grid; gap: calc(var(--u) * 8); }
-.mode {
-  display: grid;
-  grid-template-columns: 1fr auto;
+.m {
+  display: flex;
   align-items: baseline;
-  gap: calc(var(--u) * 2) calc(var(--u) * 10);
-  padding: calc(var(--u) * 9) calc(var(--u) * 14);
-  text-align: left;
+  gap: calc(var(--u) * 10);
+  width: 100%;
+  min-height: calc(var(--u) * 52);
+  padding: calc(var(--u) * 12) 0;
+  border-top: 1px solid rgba(243, 237, 216, 0.22);
   color: var(--cream);
-  background: rgba(15, 12, 8, 0.6);
-  border: calc(var(--u) * 1.5) solid rgba(243, 237, 216, 0.7);
-  transition: transform 0.06s;
+  text-align: left;
 }
-.mode:active { transform: translate(calc(var(--u) * 2), calc(var(--u) * 2)); }
-.mode.main { background: var(--cream); color: var(--ink); border-color: var(--ink); box-shadow: calc(var(--u) * 4) calc(var(--u) * 5) 0 var(--ink-2); }
-.mode-name { display: flex; align-items: center; gap: calc(var(--u) * 8); }
-.mode-name b { font-size: calc(var(--u) * 19); font-weight: 900; letter-spacing: 0.06em; }
-.mode .day { font-style: normal; font-family: var(--num); font-size: calc(var(--u) * 10); padding: calc(var(--u) * 1) calc(var(--u) * 5); background: var(--red); color: var(--cream); }
-.mode-best { font-family: var(--num); font-weight: 900; font-size: calc(var(--u) * 14); text-align: right; font-variant-numeric: tabular-nums; }
-.mode-best small { font-size: calc(var(--u) * 9); opacity: 0.6; margin-right: calc(var(--u) * 4); }
-.mode-desc { grid-column: 1 / -1; font-size: calc(var(--u) * 11.5); font-weight: 700; opacity: 0.72; line-height: 1.45; }
-.title-best { font-size: calc(var(--u) * 12); font-weight: 700; color: var(--dim); }
-.title-best b { font-family: var(--num); color: var(--cream); font-weight: 900; margin-left: calc(var(--u) * 4); }
-.title-best .sep { display: inline-block; width: calc(var(--u) * 1); height: calc(var(--u) * 10); background: var(--dim); margin: 0 calc(var(--u) * 12); vertical-align: middle; }
+.m:last-child { border-bottom: 1px solid rgba(243, 237, 216, 0.22); }
+.m-name { font-size: calc(var(--u) * 21); font-weight: 800; letter-spacing: 0.1em; transition: transform 0.12s; }
+.m-day { font-family: var(--num); font-size: calc(var(--u) * 11); font-weight: 900; color: var(--red); }
+.m-best { margin-left: auto; font-family: var(--num); font-size: calc(var(--u) * 13); font-weight: 900; opacity: 0.55; font-variant-numeric: tabular-nums; }
+.m:active .m-name, .m:focus-visible .m-name { transform: translateX(calc(var(--u) * 6)); }
+.menu-sub {
+  margin-top: calc(var(--u) * 20);
+  padding: calc(var(--u) * 8) 0;
+  font-size: calc(var(--u) * 13);
+  font-weight: 700;
+  color: var(--cream);
+  opacity: 0.6;
+  text-decoration: underline;
+  text-underline-offset: calc(var(--u) * 5);
+}
 
 /* ───────── 強化カード ───────── */
 .cards { display: grid; gap: calc(var(--u) * 12); }
@@ -442,7 +426,6 @@ button:focus-visible { outline: calc(var(--u) * 2) dashed var(--red); outline-of
   box-shadow: calc(var(--u) * 4) calc(var(--u) * 4) 0 var(--ink);
   animation: card-in 0.4s cubic-bezier(0.2, 1.3, 0.4, 1) both;
 }
-.card:nth-child(2) { transform: rotate(0.5deg); }
 .card:active { transform: translate(calc(var(--u) * 3), calc(var(--u) * 3)); box-shadow: calc(var(--u) * 1) calc(var(--u) * 1) 0 var(--ink); }
 .card-icon {
   flex: none;
@@ -597,7 +580,7 @@ button:focus-visible { outline: calc(var(--u) * 2) dashed var(--red); outline-of
   left: 50%;
   top: calc(var(--u) * 44);
   z-index: 40;
-  transform: translate(-50%, calc(var(--u) * -8)) rotate(-1deg);
+  transform: translate(-50%, calc(var(--u) * -8));
   opacity: 0;
   pointer-events: none;
   background: var(--cream);
@@ -610,7 +593,7 @@ button:focus-visible { outline: calc(var(--u) * 2) dashed var(--red); outline-of
   white-space: nowrap;
   transition: opacity 0.18s, transform 0.18s;
 }
-.toast.show { opacity: 1; transform: translate(-50%, 0) rotate(-1deg); }
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
 
 .rotate-hint { display: none; }
 @media (orientation: landscape) and (max-height: 500px) and (pointer: coarse) {
@@ -646,8 +629,8 @@ button:focus-visible { outline: calc(var(--u) * 2) dashed var(--red); outline-of
 }
 
 @keyframes fade-in { from { opacity: 0; } }
-@keyframes drop-in { from { transform: translateY(calc(var(--u) * -30)) rotate(-3deg); opacity: 0; } }
-@keyframes card-in { from { transform: translateX(calc(var(--u) * 40)) rotate(2deg); opacity: 0; } }
+@keyframes drop-in { from { transform: translateY(calc(var(--u) * 16)); opacity: 0; } }
+@keyframes card-in { from { transform: translateY(calc(var(--u) * 12)); opacity: 0; } }
 @keyframes ad-bob { to { transform: rotate(4deg) translateY(calc(var(--u) * -8)); } }
 
 @media (prefers-reduced-motion: reduce) {

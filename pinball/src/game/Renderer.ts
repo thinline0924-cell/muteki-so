@@ -2,7 +2,6 @@
 // ネオンの光るペグも、色ごとに一度だけ描いた「スプライト」(使い回し用の小さな絵)を貼る。
 
 import { BOARD, COLORS, FEVER_COMBO, FONT, H, LAUNCHER, NUM_FONT, PEG_COLOR, W, lineTarget, type PegType } from './constants';
-import { drawMascot } from './Mascot';
 import type { Game } from './Game';
 import { fmt, fmtMult } from './JuiceManager';
 import type { Ball, Peg } from './Physics';
@@ -231,17 +230,6 @@ export class Renderer {
       c.lineTo(468 + Math.cos(a) * 42, 112 + Math.sin(a) * 42);
     }
     c.stroke();
-    // 棚板(怪獣が座る場所)
-    c.fillStyle = '#d1c9a5';
-    c.fillRect(150, 192, 240, 12);
-    c.lineWidth = 2.6;
-    c.beginPath();
-    sk.rect(c, 150, 192, 240, 12, 0.8);
-    sk.line(c, 176, 204, 182, 226, 0.5);
-    sk.line(c, 364, 204, 358, 226, 0.5);
-    c.stroke();
-    this.hatch(c, sk, 156, 205, 228, 6);
-
     // 上下の暗い帯(上は DOM のメニュー、下は残りショット表示の土台)
     c.fillStyle = '#17130e';
     c.fillRect(0, 0, W, 34);
@@ -517,11 +505,13 @@ export class Renderer {
     if (j.fever) this.drawFeverBg(ctx, t, j.feverT);
 
     this.drawHudPanels(g, t);
+    // タイトルでは盤面を描かない(夜の窓だけを見せて、タイトルを読みやすく)
+    const title = g.state === 'title';
     this.drawReadout(g);
-    this.drawPegs(g.pegs, t);
+    if (!title) this.drawPegs(g.pegs, t);
     if (g.state === 'aim' && g.aim.active && g.prediction) this.drawPrediction(g);
     this.drawBalls(g.balls, j.fever, t);
-    this.drawLauncher(g, t);
+    if (!title) this.drawLauncher(g, t);
     j.drawEffects(ctx);
     this.drawShotHud(g, t);
     if (g.resolveAnim) this.drawResolve(g);
@@ -630,7 +620,7 @@ export class Renderer {
     ctx.fillText(String(title ? g.save.data.bestLine : g.line), 72, 116);
 
     if (title) {
-      this.drawTitleRoom(g, t);
+      this.drawTitleRoom();
       return;
     }
 
@@ -662,8 +652,6 @@ export class Renderer {
       ctx.fillText(`BEST ${fmt(best)}`, 262, 140);
     }
 
-    // 応援役の怪獣(棚の右はし)
-    drawMascot(ctx, g.mascot, 364, 192, t, false, 0.46);
 
     // 時計:夜明けまでの残りショット
     const timed = !!g.mode.time;
@@ -727,19 +715,9 @@ export class Renderer {
     ctx.fillText(nt, 270, by + 7.5);
   }
 
-  /** タイトル画面:寝ている怪獣と、今の時刻を指す時計 */
-  private drawTitleRoom(g: Game, t: number): void {
+  /** タイトル画面:今の時刻を指す時計 */
+  private drawTitleRoom(): void {
     const ctx = this.ctx;
-    drawMascot(ctx, g.mascot, 270, 192, t * 0.5, true);
-    ctx.save();
-    ctx.fillStyle = INK;
-    for (let i = 0; i < 3; i++) {
-      const p = (t * 0.4 + i / 3) % 1;
-      ctx.globalAlpha = Math.sin(p * Math.PI);
-      ctx.font = `900 ${12 + p * 10}px ${NUM_FONT}`;
-      ctx.fillText('z', 312 + p * 30 + Math.sin(p * 6) * 4, 92 - p * 40);
-    }
-    ctx.restore();
     const now = new Date();
     const h = (now.getHours() % 12) + now.getMinutes() / 60;
     const m = now.getMinutes() + now.getSeconds() / 60;

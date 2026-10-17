@@ -19,7 +19,6 @@ import {
   BALL_R, COLORS, DRAIN_Y, H, LAUNCH_SPEED, LAUNCHER, MAX_BALLS, PEG_COLOR, PEG_R, PHYS_DT, W, lineTarget,
   type PegType,
 } from './constants';
-import { makeMascot, updateMascot } from './Mascot';
 import { JuiceManager, fmt } from './JuiceManager';
 import { MonetizationManager } from './MonetizationManager';
 import { getMode, type ModeDef, type ModeId } from './Modes';
@@ -69,7 +68,6 @@ export class Game {
   /** 残りショット数と、使ったショット数 */
   shotsLeft = 10;
   shotsUsed = 0;
-  readonly mascot = makeMascot();
   /** 夜の進み具合(0 = 真夜中 → 1 = 夜明け)。空の色に使う。ゆっくり目標に近づく */
   nightP = 0;
   /** ショットごとのスコアの記録(結果画面のグラフ用) */
@@ -252,7 +250,6 @@ export class Game {
       if (p.flash > 0) p.flash = Math.max(0, p.flash - realDt * 5);
       if (p.cooldown > 0) p.cooldown -= gdt;
     }
-    updateMascot(this.mascot, realDt);
     // 空の色:使ったショットの割合で夜が明けていく
     const total = this.shotsUsed + this.shotsLeft;
     const nightTarget =
@@ -679,7 +676,6 @@ export class Game {
   private addScore(amount: number): void {
     this.score += amount;
     this.scorePop = 1;
-    this.mascot.hop = 1;
     const power = Math.log10(amount + 1);
     this.juice.shake(3 + power * 2);
     this.juice.hitStop(35);
@@ -716,7 +712,6 @@ export class Game {
     this.shotsLeft += bonus;
     this.pendingCards += crossed;
     this.state = 'busy';
-    this.mascot.cheer = 1;
     this.juice.burst(270, 104, COLORS.multi, 40, 700, 3.2);
     this.juice.flash(COLORS.cream, 0.3);
     this.juice.shake(12);
