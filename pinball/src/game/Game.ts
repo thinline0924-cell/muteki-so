@@ -22,7 +22,7 @@ import {
 import { JuiceManager, fmt } from './JuiceManager';
 import { MonetizationManager } from './MonetizationManager';
 import { getMode, type ModeDef, type ModeId } from './Modes';
-import { todayKey, useSeed } from './rng';
+import { restoreSeedState, seedState, todayKey, useSeed } from './rng';
 import { PegGrid, makeBall, predictPath, stepBall, type Ball, type Peg, type StepHooks } from './Physics';
 import { Renderer } from './Renderer';
 import { META, Save } from './Save';
@@ -32,6 +32,37 @@ import { UI } from '../ui/UI';
 export type State = 'title' | 'aim' | 'shoot' | 'resolve' | 'busy' | 'cards' | 'over';
 type HitSource = 'ball' | 'bomb' | 'zap' | 'detonate';
 export type DebugAction = 'fire20' | 'convert' | 'coins' | 'skip' | 'shots' | 'resetpass';
+
+/** 途中で閉じたランの続き(ショットとショットの間の状態だけを保存する) */
+interface RunSnap {
+  v: 1;
+  mode: ModeId;
+  /** 今夜の一局の日付(日付が変わったら続きは無効) */
+  day: string;
+  stats: RunStats;
+  owned: Array<[string, number]>;
+  score: number;
+  line: number;
+  shotsLeft: number;
+  shotsUsed: number;
+  timeLeft: number;
+  shotLog: number[];
+  pegs: Peg[];
+  pendingCards: number;
+  continued: boolean;
+  passedBest: boolean;
+  runCoins: number;
+  maxShotDamage: number;
+  bestCombo: number;
+  shotsFired: number;
+  seed: [number, number] | null;
+  /** 撃った後、結果が出る前に閉じた(再開時はそのショットを 0 点として数える) */
+  pending: boolean;
+}
+
+/** 誤発射を防ぐ:これより動かさず、これより短く触れただけなら撃たない */
+const TAP_MOVE = 10;
+const TAP_HOLD = 0.18;
 
 interface Timed {
   t: number;
@@ -76,7 +107,14 @@ export class Game {
   readonly grid = new PegGrid();
   balls: Ball[] = [];
 
-  aim = { active: false, angle: 0, cancel: false };
+  aim = { active: false, angle: 0, cancel: false, sx: 0, sy: 0, moved: 0, t0: 0 };
+  /** 長いショットの早送り倍率(10 秒を過ぎると 3 倍まで上がる) */
+  ff = 1;
+  /** 一時停止中か */
+  paused = false;
+  /** 「タップだけでは撃てない」案内を最後に出した時刻 */
+  private tapHintT = -10;
+  private lastDraw = 0;
   prediction: { pts: number[]; hitIndex: number } | null = null;
   boostArmed = false;
   shotDamage = 0;
@@ -115,14 +153,9 @@ export class Game {
     this.renderer = new Renderer(this.ui.canvas);
     this.money = new MonetizationManager(this.save, this.audio, this.frame, (m) => this.ui.toast(m));
     this.stats = baseStats(this.save.data.meta, this.mode);
-    this.speed = this.save.data.pass ? Math.min(3, Math.max(1, this.save.data.speed)) : 1;
-    this.audio.setMuted(this.save.data.muted);
-    // 「視差効果を減らす」設定の人には画面の揺れを弱くする
-    try {
-      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) this.juice.motionScale = 0.3;
-    } catch {
-      /* 判定できなければそのまま */
-    }
+    // 2x は無料、3x はパス特典
+    this.speed = Math.min(this.save.data.pass ? 3 : 2, Math.max(1, this.save.data.speed || 1));
+    this.applySettings();
     this.hooks = {
       onPeg: (b, p) => this.onBallPeg(b, p),
       onWall: (b) => this.onWall(b),
@@ -134,6 +167,11 @@ export class Game {
     this.resize();
     this.refreshBoard(false);
     this.ui.showTitle();
+    // 別のアプリに切り替えた・画面を消したときは自動で一時停止
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) this.autoPause();
+    });
+    window.addEventListener('blur', () => this.autoPause());
   }
 
   start(): void {
@@ -160,20 +198,37 @@ export class Game {
       if (this.state !== 'aim' || this.isPaused()) return;
       e.preventDefault();
       c.setPointerCapture(e.pointerId);
+      const p = toLogical(e);
       this.aim.active = true;
-      this.updateAim(toLogical(e));
+      this.aim.sx = p.x;
+      this.aim.sy = p.y;
+      this.aim.moved = 0;
+      this.aim.t0 = performance.now();
+      this.updateAim(p);
     });
     c.addEventListener('pointermove', (e) => {
       if (!this.aim.active) return;
-      this.updateAim(toLogical(e));
+      const p = toLogical(e);
+      this.aim.moved = Math.max(this.aim.moved, Math.hypot(p.x - this.aim.sx, p.y - this.aim.sy));
+      this.updateAim(p);
     });
     c.addEventListener('pointerup', (e) => {
       if (!this.aim.active) return;
       this.aim.active = false;
       const p = toLogical(e);
       // 発射口より上(壁のあたり)で離したらキャンセル
-      if (p.y < LAUNCHER.y - 30 || this.state !== 'aim') {
+      if (p.y < LAUNCHER.y - 30 || this.state !== 'aim' || this.isPaused()) {
         this.prediction = null;
+        return;
+      }
+      // ちょんと触れただけ(スクロールのつもり・ボタンの押し間違い)では撃たない。狙いだけ合わせる
+      const held = (performance.now() - this.aim.t0) / 1000;
+      if (this.aim.moved < TAP_MOVE && held < TAP_HOLD) {
+        const now = performance.now() / 1000;
+        if (now - this.tapHintT > 4) {
+          this.tapHintT = now;
+          this.juice.text(270, LAUNCHER.y + 120, '少し長く押すか、なぞって離すと発射', COLORS.cream, 17);
+        }
         return;
       }
       this.fire(this.aim.angle);
@@ -187,6 +242,11 @@ export class Game {
       window.addEventListener(ev, () => this.audio.unlock(), { passive: true });
     }
     window.addEventListener('keydown', (e) => {
+      if (e.code === 'Escape' || e.code === 'KeyP') {
+        if (this.paused) this.resume();
+        else this.pause();
+        return;
+      }
       if (e.code === 'Space' && this.state === 'aim' && !this.isPaused()) {
         e.preventDefault();
         this.audio.unlock();
@@ -221,17 +281,76 @@ export class Game {
   }
 
   isPaused(): boolean {
-    return this.money.busy || this.ui.isShopOpen();
+    return this.paused || this.money.busy || this.ui.isShopOpen();
+  }
+
+  /** 遊んでいる最中か(タイトルと結果画面以外) */
+  inRun(): boolean {
+    return this.state !== 'title' && this.state !== 'over';
+  }
+
+  /** 一時停止して、設定のシートを開く(タイトルでは設定だけ) */
+  pause(): void {
+    if (this.paused) return;
+    this.paused = this.inRun();
+    this.aim.active = false;
+    this.ui.showPause(this.paused);
+  }
+
+  resume(): void {
+    this.paused = false;
+    this.ui.hidePause();
+    // 止めていた間の時間を、まとめて進めない
+    this.lastTime = performance.now();
+  }
+
+  private autoPause(): void {
+    if (this.inRun() && !this.paused && !this.money.busy) this.pause();
+  }
+
+  /** 設定を反映する(音・振動・演出・省電力) */
+  applySettings(): void {
+    const d = this.save.data;
+    this.audio.setMuted(false);
+    this.audio.setBgm(d.bgm);
+    this.audio.setSfx(d.sfx);
+    let reduce = false;
+    try {
+      reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    } catch {
+      /* 判定できなければそのまま */
+    }
+    // 「視差効果を減らす」端末設定か「演出を控えめに」なら、揺れとフラッシュを弱くする
+    this.juice.motionScale = d.calmFx || reduce ? 0.3 : 1;
+    this.juice.flashScale = d.calmFx ? 0.35 : 1;
+    if (this.renderer.lowRes !== d.saver) {
+      this.renderer.lowRes = d.saver;
+      this.resize();
+    }
+  }
+
+  setSetting(key: 'bgm' | 'sfx' | 'vibe' | 'calmFx' | 'saver', on: boolean): void {
+    this.audio.unlock();
+    this.save.data[key] = on;
+    this.save.write();
+    this.applySettings();
+    if (key === 'vibe' && on) this.buzz(30);
   }
 
   // ───────── メインループ ─────────
 
   private loop = (now: number): void => {
+    // 省電力:30fps に間引く
+    if (this.save.data.saver && now - this.lastDraw < 30) {
+      requestAnimationFrame(this.loop);
+      return;
+    }
+    this.lastDraw = now;
     const realDt = Math.min(0.05, Math.max(0, (now - this.lastTime) / 1000));
     this.lastTime = now;
     // 重い端末では自動で演出を軽くする(ヒステリシス付き)
     this.frameEma = this.frameEma * 0.95 + realDt * 1000 * 0.05;
-    if (this.frameEma > 26) this.juice.lowFx = true;
+    if (this.save.data.saver || this.frameEma > 26) this.juice.lowFx = true;
     else if (this.frameEma < 19) this.juice.lowFx = false;
     if (!this.isPaused()) this.update(realDt);
     this.renderer.draw(this);
@@ -241,7 +360,11 @@ export class Game {
 
   private update(realDt: number): void {
     const ts = this.juice.timeScale(realDt);
-    const gdt = realDt * ts * this.speed;
+    // 玉がなかなか落ちないショットは、10 秒を過ぎたら少しずつ早送り(最大 3 倍)
+    const ffTarget = this.state === 'shoot' && this.shotTime > 10 ? Math.min(3, 1 + (this.shotTime - 10) / 4) : 1;
+    this.ff += (ffTarget - this.ff) * Math.min(1, realDt * 4);
+    if (Math.abs(this.ff - ffTarget) < 0.01) this.ff = ffTarget;
+    const gdt = realDt * ts * this.speed * this.ff;
     this.juice.update(gdt, realDt);
     this.runTimers(this.timers, gdt);
 
@@ -310,7 +433,7 @@ export class Game {
     this.runTimers(this.shotEvents, gdt);
 
     this.acc += gdt;
-    const maxSteps = Math.ceil((0.05 * this.speed) / PHYS_DT) + 2;
+    const maxSteps = Math.ceil((0.05 * this.speed * this.ff) / PHYS_DT) + 2;
     let steps = 0;
     while (this.acc >= PHYS_DT && steps < maxSteps) {
       this.physicsStep(PHYS_DT);
@@ -410,6 +533,7 @@ export class Game {
     this.boostArmed = false;
     if (!this.mode.time) this.shotsLeft--;
     this.shotsUsed++;
+    this.markShotPending();
     this.beginShot();
     const spread = Math.min(0.05, 0.5 / n);
     for (let i = 0; i < n; i++) {
@@ -666,6 +790,7 @@ export class Game {
     if (amount > this.save.data.bestDamage) this.save.data.bestDamage = amount;
     if (amount <= 0) {
       this.juice.text(270, 330, 'MISS', COLORS.cream, 30, true);
+      this.saveRun();
       this.after(0.5, () => this.nextTurn());
       return;
     }
@@ -702,6 +827,7 @@ export class Game {
       crossed++;
     }
     if (crossed === 0) {
+      this.saveRun();
       this.after(0.45, () => this.nextTurn());
       return;
     }
@@ -711,6 +837,7 @@ export class Game {
     if (every > 0) for (let k = this.line - crossed + 1; k <= this.line; k++) if (k % every === 0) bonus++;
     this.shotsLeft += bonus;
     this.pendingCards += crossed;
+    this.saveRun();
     this.state = 'busy';
     this.juice.burst(270, 104, COLORS.multi, 40, 700, 3.2);
     this.juice.flash(COLORS.cream, 0.3);
@@ -754,6 +881,7 @@ export class Game {
     }
     if (!this.mode.time && this.shotsLeft === 1) this.juice.text(270, 600, 'ラスト 1 球', COLORS.red, 46, false, true);
     this.state = 'aim';
+    this.saveRun();
   }
 
   private boardSpec() {
@@ -835,6 +963,7 @@ export class Game {
       this.audio.dawn();
     }
     d.bestLine = Math.max(d.bestLine, this.line);
+    d.run = null;
     this.save.write();
     this.juice.showBanner(this.mode.time ? '時間切れ' : '夜明け', `SCORE ${fmt(this.score)}`, COLORS.ink, 1.6, 'card');
     this.after(1.7, () => {
@@ -947,11 +1076,108 @@ export class Game {
     this.juice.showBanner('READY', this.mode.time ? `${this.mode.time} 秒の勝負` : `${this.mode.name} ・ ${this.shotsLeft} ショット`, COLORS.cream, 1.4);
     this.audio.setCalm(false);
     this.state = 'aim';
+    this.saveRun();
     this.ui.hideTitle();
     this.ui.hideResult();
   }
 
+  // ───────── 続きから(途中で閉じても、ショットの間の状態から再開できる) ─────────
+
+  private saveRun(): void {
+    const snap: RunSnap = {
+      v: 1,
+      mode: this.mode.id,
+      day: todayKey(),
+      stats: { ...this.stats },
+      owned: [...this.owned],
+      score: this.score,
+      line: this.line,
+      shotsLeft: this.shotsLeft,
+      shotsUsed: this.shotsUsed,
+      timeLeft: this.timeLeft,
+      shotLog: this.shotLog.slice(),
+      pegs: this.pegs.map((p) => ({ ...p, flash: 0, spawn: 1, cooldown: 0, marked: false })),
+      pendingCards: this.pendingCards,
+      continued: this.continued,
+      passedBest: this.passedBest,
+      runCoins: this.runCoins,
+      maxShotDamage: this.maxShotDamage,
+      bestCombo: this.juice.bestCombo,
+      shotsFired: this.shotsFired,
+      seed: seedState(),
+      pending: false,
+    };
+    this.save.data.run = snap;
+    this.save.write();
+  }
+
+  /** 撃った瞬間に「結果待ち」の印を付ける(閉じて撃ち直す、のずるを防ぐ) */
+  private markShotPending(): void {
+    const snap = this.save.data.run as RunSnap | null;
+    if (!snap) return;
+    snap.pending = true;
+    this.save.write();
+  }
+
+  /** 続きから遊べるランがあれば、その概要(タイトルの表示用) */
+  savedRun(): { mode: ModeDef; line: number; shotsLeft: number; timeLeft: number; score: number } | null {
+    const snap = this.save.data.run as RunSnap | null;
+    if (!snap || snap.v !== 1 || !Array.isArray(snap.pegs)) return null;
+    const mode = getMode(snap.mode);
+    if (!mode || (mode.seeded && snap.day !== todayKey())) return null;
+    return { mode, line: snap.line, shotsLeft: snap.shotsLeft, timeLeft: snap.timeLeft, score: snap.score };
+  }
+
+  resumeRun(): void {
+    const info = this.savedRun();
+    const snap = this.save.data.run as RunSnap | null;
+    if (!info || !snap) {
+      this.save.data.run = null;
+      this.save.write();
+      this.ui.showTitle();
+      return;
+    }
+    this.mode = info.mode;
+    this.newRun();
+    restoreSeedState(snap.seed);
+    this.stats = { ...this.stats, ...snap.stats };
+    this.owned = new Map(snap.owned);
+    this.score = snap.score;
+    this.shownScore = snap.score;
+    this.line = snap.line;
+    this.shotsLeft = snap.shotsLeft;
+    this.shotsUsed = snap.shotsUsed;
+    this.timeLeft = snap.timeLeft;
+    this.shotLog = snap.shotLog.slice();
+    this.pegs = snap.pegs.map((p) => ({ ...p }));
+    this.grid.rebuild(this.pegs);
+    this.pendingCards = snap.pendingCards;
+    this.continued = snap.continued;
+    this.passedBest = snap.passedBest;
+    this.runCoins = snap.runCoins;
+    this.maxShotDamage = snap.maxShotDamage;
+    this.juice.bestCombo = snap.bestCombo;
+    this.shotsFired = snap.shotsFired;
+    this.juice.clearEffects();
+    let note = 'ショットの前から再開';
+    if (snap.pending) {
+      // 撃ったあと結果を見る前に閉じたショットは、0 点として数える(九十秒は 4 秒減らす)
+      this.shotLog.push(0);
+      this.shotsUsed++;
+      if (this.mode.time) this.timeLeft = Math.max(0, this.timeLeft - 4);
+      else this.shotsLeft = Math.max(0, this.shotsLeft - 1);
+      note = '中断したショットは 0 点として数えました';
+    }
+    this.saveRun();
+    this.juice.showBanner('続きから', note, COLORS.cream, 1.6);
+    this.state = 'busy';
+    if (this.pendingCards > 0) this.after(0.6, () => this.openCards());
+    else this.after(0.6, () => this.nextTurn());
+  }
+
   toTitle(): void {
+    this.paused = false;
+    this.ui.hidePause();
     this.state = 'title';
     this.sunrise = false;
     useSeed(null);
@@ -980,7 +1206,8 @@ export class Game {
   }
 
   setSpeed(s: number): void {
-    if (s > 1 && !this.money.hasPass) {
+    // 2x は誰でも無料。3x だけパス特典
+    if (s > 2 && !this.money.hasPass) {
       this.pendingSpeed = s;
       this.ui.openShop('pass');
       return;
@@ -997,7 +1224,7 @@ export class Game {
           this.setSpeed(this.pendingSpeed);
           this.ui.toast(`購入完了!${this.pendingSpeed}x スピードで遊べます`);
         } else {
-          this.ui.toast('購入完了!2x / 3x が使えるようになりました');
+          this.ui.toast('購入完了!3x が使えるようになりました');
         }
         this.pendingSpeed = 0;
       }
@@ -1022,16 +1249,9 @@ export class Game {
     this.ui.toast(`${def.name} → Lv ${lv + 1}(次のランから反映)`);
   }
 
-  toggleMute(): void {
-    this.audio.unlock();
-    this.save.data.muted = !this.save.data.muted;
-    this.audio.setMuted(this.save.data.muted);
-    this.save.write();
-  }
-
-  /** スマホを震わせる(対応している端末だけ。音を消しているときは震わせない) */
+  /** スマホを震わせる(対応している端末だけ。設定で振動を切っているときは震わせない) */
   private buzz(pattern: number | number[]): void {
-    if (this.save.data.muted) return;
+    if (!this.save.data.vibe) return;
     try {
       navigator.vibrate?.(pattern);
     } catch {

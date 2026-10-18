@@ -661,3 +661,50 @@ button:focus-visible { outline: calc(var(--u) * 2) dashed var(--red); outline-of
   .ad-mark { animation: none; }
   .sheet, .card { animation: none; }
 }
+
+/* ───────── 続きから(タイトルの一番上) ───────── */
+.m.resume { flex-wrap: wrap; row-gap: calc(var(--u) * 2); }
+.m.resume .m-name { color: var(--cream); }
+.m.resume .m-day { font-family: inherit; font-weight: 800; font-size: calc(var(--u) * 11.5); color: rgba(243, 237, 216, 0.7); letter-spacing: 0.04em; }
+.m.resume::before {
+  content: "";
+  align-self: center;
+  width: calc(var(--u) * 6);
+  height: calc(var(--u) * 6);
+  background: var(--red);
+}
+
+/* ───────── 一時停止ボタン(遊んでいる間は縦 2 本線) ───────── */
+.pause-btn { display: inline-flex; align-items: center; justify-content: center; }
+.pause-ico { display: none; width: calc(var(--u) * 9); height: calc(var(--u) * 10); border-left: calc(var(--u) * 3) solid currentColor; border-right: calc(var(--u) * 3) solid currentColor; }
+.pause-btn.playing { min-width: calc(var(--u) * 30); }
+.pause-btn.playing .pause-ico { display: block; }
+.pause-btn.playing .pause-txt { display: none; }
+
+/* ───────── 一時停止と設定のシート ───────── */
+.settings { list-style: none; margin: 0; padding: 0; }
+.settings li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: calc(var(--u) * 12);
+  padding: calc(var(--u) * 8) calc(var(--u) * 2);
+  border-top: calc(var(--u) * 1.5) dotted var(--ink);
+  font-size: calc(var(--u) * 15);
+  font-weight: 900;
+}
+.settings li:last-child { border-bottom: calc(var(--u) * 1.5) dotted var(--ink); }
+.settings small { display: block; font-size: calc(var(--u) * 11); font-weight: 700; opacity: 0.7; margin-top: calc(var(--u) * 2); }
+.sw {
+  flex: none;
+  min-width: calc(var(--u) * 64);
+  height: calc(var(--u) * 34);
+  font-size: calc(var(--u) * 13);
+  font-weight: 900;
+  border: calc(var(--u) * 2) solid var(--ink);
+  border-radius: calc(var(--u) * 2);
+  color: var(--ink);
+  background: transparent;
+}
+.sw.on { background: var(--ink); color: var(--cream); }
+.btn.bare.armed { color: var(--red); font-size: calc(var(--u) * 13.5); }

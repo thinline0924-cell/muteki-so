@@ -46,6 +46,8 @@ export class AudioEngine {
   private noise!: AudioBuffer;
   private crunch!: Float32Array<ArrayBuffer>;
   private muted = false;
+  private bgmOn = true;
+  private sfxOn = true;
   private last = new Map<string, number>();
   private voices = 0;
 
@@ -100,7 +102,7 @@ export class AudioEngine {
       this.musicFilter.frequency.value = this.calm ? 1100 : 1800;
       this.musicFilter.Q.value = 0.7;
       this.music = ctx.createGain();
-      this.music.gain.value = 0.3;
+      this.music.gain.value = this.bgmOn ? 0.3 : 0;
       this.musicFilter.connect(this.music);
       this.music.connect(this.master);
       const musicSend = ctx.createGain();
@@ -153,6 +155,17 @@ export class AudioEngine {
     if (this.ctx) this.master.gain.setTargetAtTime(m ? 0 : 0.8, this.ctx.currentTime, 0.05);
   }
 
+  /** BGM だけのオン・オフ(自分の音楽を聴きながら遊びたい人向け) */
+  setBgm(on: boolean): void {
+    this.bgmOn = on;
+    if (this.ctx) this.music.gain.setTargetAtTime(on ? 0.3 : 0, this.ctx.currentTime, 0.1);
+  }
+
+  /** 効果音だけのオン・オフ */
+  setSfx(on: boolean): void {
+    this.sfxOn = on;
+  }
+
   /** フィーバー中は BGM のフィルターを開いて音数を増やす */
   setFever(on: boolean): void {
     this.fever = on;
@@ -180,7 +193,7 @@ export class AudioEngine {
   // ───────── 部品 ─────────
 
   private gate(key: string, gap: number): boolean {
-    if (!this.ctx || this.muted || this.ctx.state !== 'running') return false;
+    if (!this.ctx || this.muted || !this.sfxOn || this.ctx.state !== 'running') return false;
     const now = this.ctx.currentTime;
     const prev = this.last.get(key) ?? -1;
     if (now - prev < gap) return false;
@@ -214,7 +227,7 @@ export class AudioEngine {
 
   private tone(type: OscillatorType, freq: number, t0: number, dur: number, vol: number, o: VoiceOpts = {}): void {
     const ctx = this.ctx;
-    if (!ctx) return;
+    if (!ctx || (!o.dest && !this.sfxOn)) return;
     const osc = ctx.createOscillator();
     osc.type = type;
     osc.frequency.setValueAtTime(freq, t0);
@@ -253,6 +266,7 @@ export class AudioEngine {
   private bell(freq: number, t0: number, dur: number, vol: number, o: VoiceOpts & { ratio?: number; index?: number } = {}): void {
     const ctx = this.ctx;
     if (!ctx) return;
+    if (!o.dest && !this.sfxOn) return;
     const ratio = o.ratio ?? 3.5;
     const index = o.index ?? 1.6;
     const car = ctx.createOscillator();
@@ -292,7 +306,7 @@ export class AudioEngine {
 
   private noiseHit(t0: number, dur: number, vol: number, filter: FilterSpec, o: VoiceOpts & { shape?: boolean } = {}): void {
     const ctx = this.ctx;
-    if (!ctx) return;
+    if (!ctx || (!o.dest && !this.sfxOn)) return;
     const src = ctx.createBufferSource();
     src.buffer = this.noise;
     src.playbackRate.value = rand(0.8, 1.2);
@@ -474,7 +488,7 @@ export class AudioEngine {
 
   /** 鳥のさえずり(夜明けが近いとき) */
   bird(at?: number): void {
-    if (!this.ctx || this.muted) return;
+    if (!this.ctx || this.muted || !this.sfxOn) return;
     const ctx = this.ctx;
     const t = at ?? this.now();
     const n = 2 + Math.floor(Math.random() * 3);
@@ -551,6 +565,11 @@ export class AudioEngine {
   private schedule(): void {
     const ctx = this.ctx;
     if (!ctx || ctx.state !== 'running') return;
+    // BGM を切っているときは、音を作らない(電池にもやさしい)
+    if (!this.bgmOn) {
+      this.nextTime = ctx.currentTime + 0.05;
+      return;
+    }
     const sixteenth = 60 / (this.fever ? 100 : 86) / 4;
     // タブが裏にいた間の遅れは取り戻さない(音がまとめて鳴るのを防ぐ)
     if (this.nextTime < ctx.currentTime - 0.1) this.nextTime = ctx.currentTime + 0.05;

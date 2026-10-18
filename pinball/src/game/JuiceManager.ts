@@ -102,8 +102,10 @@ export class JuiceManager {
   time = 0;
   /** 端末が重いとき true(パーティクルや文字を減らす)。Game がフレーム時間を見て切り替える */
   lowFx = false;
-  /** 画面の揺れの強さ(視差効果を減らす設定なら小さくする) */
+  /** 画面の揺れの強さ(視差効果を減らす設定・控えめな演出なら小さくする) */
   motionScale = 1;
+  /** フラッシュの強さ(控えめな演出なら小さくする) */
+  flashScale = 1;
 
   private audio: AudioEngine;
 
@@ -145,7 +147,7 @@ export class JuiceManager {
     // 連続で光っても画面が真っ白にならないよう、上限を決める
     if (this.flashA > 0.12 && a < 0.3) return;
     this.flashColor = color;
-    this.flashA = Math.max(this.flashA, a);
+    this.flashA = Math.max(this.flashA, a * this.flashScale);
   }
 
   // ───────── 生成 ─────────

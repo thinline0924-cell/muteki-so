@@ -22,6 +22,14 @@ export interface SaveData {
   speed: number;
   /** 遊び方の自動表示:first = まだ見ていない / on = 毎回 / off = 出さない */
   howto: 'first' | 'on' | 'off';
+  /** 設定:BGM・効果音・振動・控えめな演出(揺れ・フラッシュ)・省電力(30fps・低画質) */
+  bgm: boolean;
+  sfx: boolean;
+  vibe: boolean;
+  calmFx: boolean;
+  saver: boolean;
+  /** 途中で閉じたランの続き(ショットの前にだけ保存する) */
+  run: unknown;
 }
 
 const KEY = 'yorumado-pinball-v1';
@@ -37,6 +45,12 @@ const DEFAULT: SaveData = {
   muted: false,
   speed: 1,
   howto: 'first',
+  bgm: true,
+  sfx: true,
+  vibe: true,
+  calmFx: false,
+  saver: false,
+  run: null,
 };
 
 export interface MetaDef {
@@ -66,6 +80,12 @@ export class Save {
       if (raw) {
         const d = JSON.parse(raw) as Partial<SaveData>;
         this.data = { ...this.data, ...d, meta: { ...DEFAULT.meta, ...(d.meta ?? {}) }, bests: { ...(d.bests ?? {}) } };
+      }
+      // 昔の「音を消す」(全部まとめて)を、BGM と効果音の設定に引き継ぐ
+      if (this.data.muted) {
+        this.data.bgm = false;
+        this.data.sfx = false;
+        this.data.muted = false;
       }
       // 昔の自己ベスト(一晩モード)を引き継ぐ
       if (this.data.bestScore > (this.data.bests.night ?? 0)) this.data.bests.night = this.data.bestScore;

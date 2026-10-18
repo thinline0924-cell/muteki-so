@@ -35,8 +35,11 @@ export class Renderer {
     this.ctx = canvas.getContext('2d')!;
   }
 
+  /** 省電力:解像度を 1 倍に落とす */
+  lowRes = false;
+
   resize(cssW: number, cssH: number): void {
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const dpr = this.lowRes ? 1 : Math.min(window.devicePixelRatio || 1, 2);
     this.canvas.width = Math.round(cssW * dpr);
     this.canvas.height = Math.round(cssH * dpr);
     this.canvas.style.width = cssW + 'px';
@@ -1201,6 +1204,10 @@ export class Renderer {
     if (g.boostArmed && g.state === 'aim') {
       const n = g.stats.ballsPerShot * 2;
       this.tag(372, 300, '今回 ×2 BALL', { size: 14, rot: -0.06, badge: String(n) });
+    }
+    // 長いショットの早送り中は、小さな札で知らせる
+    if (g.state === 'shoot' && g.ff > 1.05) {
+      this.tag(W - 70, 252, `早送り ×${g.ff.toFixed(1)}`, { size: 12, dark: true });
     }
     if (g.state === 'aim' && !g.aim.active && g.shotsFired < 2) {
       const a = 0.75 + Math.sin(t * 4) * 0.25;

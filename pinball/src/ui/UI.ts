@@ -41,7 +41,7 @@ const TEMPLATE = `
         <button data-speed="2">2x</button>
         <button data-speed="3">3x</button>
       </div>
-      <button class="tb-btn" data-act="sound" aria-label="音のオン・オフ">音</button>
+      <button class="tb-btn pause-btn" data-act="pause" aria-label="一時停止と設定"><span class="pause-ico" aria-hidden="true"></span><span class="pause-txt">設定</span></button>
       <button class="tb-btn" data-act="shop" aria-label="ショップ">店</button>
       <button class="tb-btn debug-btn" data-act="debug" aria-expanded="false"><span class="mono">🛠️</span>Debug</button>
     </div>
@@ -104,7 +104,7 @@ const TEMPLATE = `
           <div class="pass-head"><span class="stamp">PASS</span><h3>広告削除+倍速解放パス</h3></div>
           <div class="price">¥600<small>買い切り</small></div>
           <ul class="rows">
-            <li>2x / 3x のゲームスピードを解放</li>
+            <li>3x のゲームスピードを解放(2x は無料)</li>
             <li>リワード広告を見ずに、報酬をすぐ受け取れる</li>
             <li>一度買えばずっと有効</li>
           </ul>
@@ -143,6 +143,25 @@ const TEMPLATE = `
     </div>
   </section>
 
+  <section class="overlay pause-screen" hidden>
+    <div class="sheet pause">
+      <div class="sheet-head">
+        <span class="eyebrow" data-pause-eyebrow>PAUSE</span>
+        <h2 data-pause-title>一時停止中</h2>
+      </div>
+      <button class="btn ink" data-act="resume">再開する</button>
+      <ul class="settings">
+        <li><span>BGM</span><button class="sw" data-set="bgm"></button></li>
+        <li><span>効果音</span><button class="sw" data-set="sfx"></button></li>
+        <li><span>振動</span><button class="sw" data-set="vibe"></button></li>
+        <li><span>演出を控えめに<small>画面の揺れとフラッシュを弱くする</small></span><button class="sw" data-set="calmFx"></button></li>
+        <li><span>省電力<small>30fps・画質を下げて電池を長持ち</small></span><button class="sw" data-set="saver"></button></li>
+      </ul>
+      <button class="btn line-ink center" data-act="howto">遊び方を見る</button>
+      <button class="btn bare" data-act="quit" data-quit>タイトルへ戻る</button>
+    </div>
+  </section>
+
   <div class="toast" role="status" aria-live="polite"></div>
   <div class="rotate-hint">スマホを縦にして遊んでね</div>
   <div class="tint" aria-hidden="true"></div>
@@ -156,7 +175,8 @@ export class UI {
   private q: <T extends HTMLElement = HTMLElement>(sel: string) => T;
   private toastTimer = 0;
   private tutorial: Tutorial;
-  private cache = { coins: -1, speed: -1, pass: false, muted: false, boost: '', hudVisible: false, title: '' };
+  private cache = { coins: -1, speed: -1, pass: false, inRun: false, boost: '', hudVisible: false, title: '', ff: '' };
+  private quitArmed = false;
 
   constructor(root: HTMLElement, game: Game) {
     this.game = game;
@@ -188,6 +208,11 @@ export class UI {
       const tab = btn.dataset.tab;
       const metaKey = btn.dataset.metaBuy;
       const mode = btn.dataset.mode as ModeId | undefined;
+      const set = btn.dataset.set as 'bgm' | 'sfx' | 'vibe' | 'calmFx' | 'saver' | undefined;
+      if (set) {
+        g().setSetting(set, !g().save.data[set]);
+        this.renderSettings();
+      }
       if (mode) g().chooseMode(mode);
       if (sp) g().setSpeed(Number(sp));
       if (dbg) g().debug(dbg);
@@ -197,8 +222,24 @@ export class UI {
         this.renderMeta();
       }
       switch (act) {
-        case 'sound':
-          g().toggleMute();
+        case 'pause':
+          g().pause();
+          break;
+        case 'resume':
+          g().resume();
+          break;
+        case 'resume-run':
+          g().resumeRun();
+          break;
+        case 'quit':
+          // タイトルへは 2 回押しで(うっかり防止)。続きはタイトルの「続きから」で遊べる
+          if (!this.quitArmed) {
+            this.quitArmed = true;
+            btn.textContent = 'もう一度押すとタイトルへ(続きは保存されます)';
+            btn.classList.add('armed');
+          } else {
+            g().toTitle();
+          }
           break;
         case 'shop':
           this.openShop('pass');
@@ -244,6 +285,10 @@ export class UI {
           break;
       }
     });
+    // 画面外タップで一時停止を閉じる
+    this.q('.pause-screen').addEventListener('click', (e) => {
+      if (e.target === e.currentTarget) this.game.resume();
+    });
     // 画面外タップでショップを閉じる
     this.q('.shop-screen').addEventListener('click', (e) => {
       if (e.target === e.currentTarget) this.closeShop();
@@ -287,17 +332,18 @@ export class UI {
       this.frame.querySelectorAll<HTMLButtonElement>('[data-speed]').forEach((b) => {
         const s = Number(b.dataset.speed);
         b.classList.toggle('on', s === g.speed);
-        b.classList.toggle('locked', s > 1 && !d.pass);
-        b.setAttribute('aria-label', s > 1 && !d.pass ? `${s}倍速(パスで解放)` : `${s}倍速`);
+        b.classList.toggle('locked', s > 2 && !d.pass);
+        b.setAttribute('aria-label', s > 2 && !d.pass ? `${s}倍速(パスで解放)` : `${s}倍速`);
       });
     }
-    if (c.muted !== d.muted) {
-      c.muted = d.muted;
-      const b = this.q('[data-act="sound"]');
-      b.classList.toggle('off', d.muted);
-      b.setAttribute('aria-pressed', String(!d.muted));
-    }
     const inRun = g.state !== 'title';
+    if (c.inRun !== inRun) {
+      // 遊んでいる間は一時停止の記号、タイトルでは「設定」
+      c.inRun = inRun;
+      const b = this.q('[data-act="pause"]');
+      b.classList.toggle('playing', inRun);
+      b.setAttribute('aria-label', inRun ? '一時停止と設定' : '設定');
+    }
     // 上の帯の真ん中:遊んでいる間はモード名
     const title = inRun ? g.mode.name + (g.mode.seeded ? ` ${todayKey().slice(4, 6)}/${todayKey().slice(6)}` : '') : '';
     if (c.title !== title) {
@@ -331,7 +377,12 @@ export class UI {
   showTitle(): void {
     const d = this.game.save.data;
     const box = this.q('[data-modes]');
-    box.innerHTML = MODES.map((m) => {
+    const saved = this.game.savedRun();
+    const left = saved ? (saved.mode.time ? `残り ${Math.ceil(saved.timeLeft)} 秒` : `残り ${saved.shotsLeft} ショット`) : '';
+    const resume = saved
+      ? `<button class="m resume" data-act="resume-run"><span class="m-name">続きから</span><span class="m-day">${saved.mode.name} ・ LINE ${saved.line} ・ ${left}</span><span class="m-best">${fmt(saved.score)}</span></button>`
+      : '';
+    box.innerHTML = resume + MODES.map((m) => {
       const best = d.bests[this.game.bestKey(m)] ?? 0;
       const day = m.seeded ? `<span class="m-day">${todayKey().slice(4, 6)}/${todayKey().slice(6)}</span>` : '';
       return `<button class="m" data-mode="${m.id}"><span class="m-name">${m.name}</span>${day}<span class="m-best">${best > 0 ? fmt(best) : ''}</span></button>`;
@@ -381,6 +432,34 @@ export class UI {
     this.q('.shop-screen').hidden = true;
   }
 
+  /** 一時停止(と設定)のシート。playing = 遊んでいる最中 */
+  showPause(playing: boolean): void {
+    this.q('[data-pause-eyebrow]').textContent = playing ? 'PAUSE' : 'SETTINGS';
+    this.q('[data-pause-title]').textContent = playing ? '一時停止中' : '設定';
+    this.q('[data-act="resume"]').textContent = playing ? '再開する' : '閉じる';
+    const quit = this.q('[data-quit]');
+    quit.hidden = !playing;
+    quit.textContent = 'タイトルへ戻る';
+    quit.classList.remove('armed');
+    this.quitArmed = false;
+    this.renderSettings();
+    this.q('.pause-screen').hidden = false;
+  }
+
+  hidePause(): void {
+    this.q('.pause-screen').hidden = true;
+  }
+
+  private renderSettings(): void {
+    const d = this.game.save.data;
+    this.frame.querySelectorAll<HTMLButtonElement>('[data-set]').forEach((b) => {
+      const on = !!d[b.dataset.set as 'bgm'];
+      b.textContent = on ? 'オン' : 'オフ';
+      b.classList.toggle('on', on);
+      b.setAttribute('aria-pressed', String(on));
+    });
+  }
+
   isShopOpen(): boolean {
     return !this.q('.shop-screen').hidden || this.tutorial.isOpen();
   }
@@ -406,7 +485,7 @@ export class UI {
     btn.classList.remove('processing');
     btn.classList.toggle('owned', owned);
     btn.disabled = owned;
-    btn.textContent = owned ? '購入済み ・ 2x / 3x 解放中' : '¥600 で購入する';
+    btn.textContent = owned ? '購入済み ・ 3x 解放中' : '¥600 で購入する';
   }
 
   renderMeta(): void {
